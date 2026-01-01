@@ -37,39 +37,44 @@ document.addEventListener('DOMContentLoaded', () => {
             mouseInCanvas = false;
         });
 
-        function getBarThickness(x, y, rowIndex, currentTime, localWidth, localHeight, localMouseX, localMouseInCanvas) {
-            const rowMinWidth = config.minBarWidth;
-            const rowMaxWidth = config.maxBarWidth;
-            const rowSpeed = config.thicknessSpeed;
-            const rowOffset = config.thicknessOffset;
-            const rowAlternate = config.alternateDirection;
+        function getBarThickness(x, y, rowIndex, currentTime, localWidth, localHeight, localMouseX, localMouseInCanvas, conf) {
+            const rowMinWidth = conf.minBarWidth;
+            const rowMaxWidth = conf.maxBarWidth;
+            const rowSpeed = conf.thicknessSpeed;
+            const rowOffset = conf.thicknessOffset;
+            const rowAlternate = conf.alternateDirection;
 
             const baseThickness = (rowMinWidth + rowMaxWidth) / 2;
             const thicknessRange = (rowMaxWidth - rowMinWidth) / 2;
 
-            if (!config.animateThickness) return baseThickness;
+            if (!conf.animateThickness) return baseThickness;
 
-            // Project coordinates onto animation direction vector
-            const angleRad = (config.animationDirection || 0) * Math.PI / 180;
-            const dirX = Math.cos(angleRad);
-            const dirY = Math.sin(angleRad);
+            let projectedPos;
+            if (conf.shapeMode === 'bars') {
+                projectedPos = x / localWidth;
+            } else {
+                // Project coordinates onto animation direction vector
+                const angleRad = (conf.animationDirection || 0) * Math.PI / 180;
+                const dirX = Math.cos(angleRad);
+                const dirY = Math.sin(angleRad);
 
-            // Normalized projection
-            const projectedPos = (x * dirX + y * dirY) / (localWidth * Math.abs(dirX) + localHeight * Math.abs(dirY) || 1);
+                // Normalized projection
+                projectedPos = (x * dirX + y * dirY) / (localWidth * Math.abs(dirX) + localHeight * Math.abs(dirY) || 1);
+            }
 
             const direction = rowAlternate && (rowIndex % 2 !== 0) ? -1 : 1;
 
             let rowSpecificOffset = rowOffset;
-            if (config.combineOffsets && rowIndex > 0) {
-                rowSpecificOffset += (rowIndex * Math.PI) / config.waveRows;
+            if (conf.combineOffsets && rowIndex > 0) {
+                rowSpecificOffset += (rowIndex * Math.PI) / conf.waveRows;
             } else {
-                rowSpecificOffset += rowIndex * config.rowPeakOffset;
+                rowSpecificOffset += rowIndex * conf.rowPeakOffset;
             }
 
-            const phase = projectedPos * Math.PI * config.waveLength + currentTime * rowSpeed * direction + rowSpecificOffset;
+            const phase = projectedPos * Math.PI * conf.waveLength + currentTime * rowSpeed * direction + rowSpecificOffset;
 
             let waveValue;
-            switch (config.animationMode) {
+            switch (conf.animationMode) {
                 case 'pingpong':
                     waveValue = Math.abs(Math.sin(phase)) * 2 - 1;
                     break;
@@ -81,16 +86,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     waveValue = Math.sin(phase);
             }
 
-            if (config.thicknessCutoff > 0) {
+            if (conf.thicknessCutoff > 0) {
                 const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
-                if (cyclePhase > (1 - config.thicknessCutoff / 100)) return rowMinWidth;
+                if (cyclePhase > (1 - conf.thicknessCutoff / 100)) return rowMinWidth;
             }
 
-            if (config.trailCutoff !== 0) {
+            if (conf.trailCutoff !== 0) {
                 const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
-                const startPoint = config.trailCutoffStart / 100;
-                const trailAmount = Math.abs(config.trailCutoff) / 100 * 0.5;
-                if (config.trailCutoff > 0) {
+                const startPoint = conf.trailCutoffStart / 100;
+                const trailAmount = Math.abs(conf.trailCutoff) / 100 * 0.5;
+                if (conf.trailCutoff > 0) {
                     if (cyclePhase > startPoint && cyclePhase < startPoint + trailAmount) return rowMinWidth;
                 } else {
                     const leadStart = startPoint - trailAmount;
@@ -100,18 +105,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let thickness = baseThickness + waveValue * thicknessRange;
 
-            if (config.mouseAmplitude && localMouseInCanvas) {
+            if (conf.mouseAmplitude && localMouseInCanvas) {
                 const dx = x - localMouseX;
                 const dist = Math.abs(dx);
                 const maxDist = localWidth * 0.3;
                 const influence = Math.max(0, 1 - dist / maxDist);
-                thickness += influence * thicknessRange * (config.amplitudeStrength - 1);
+                thickness += influence * thicknessRange * (conf.amplitudeStrength - 1);
             }
 
             return Math.max(rowMinWidth, Math.min(rowMaxWidth, thickness));
         }
 
-        function drawWaveInstance(localWidth, localHeight, rotation, localMouseX, localMouseY, localMouseInCanvas, effectiveBars, effectiveRows) {
+        function drawWaveInstance(localWidth, localHeight, rotation, localMouseX, localMouseY, localMouseInCanvas, effectiveBars, effectiveRows, conf) {
             ctx.save();
 
             const roundedBars = Math.max(1, Math.round(effectiveBars));
@@ -120,30 +125,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const effectiveRowHeight = localHeight / roundedRows;
             const barSpacing = localWidth / roundedBars;
 
-            ctx.fillStyle = config.barColor;
-            ctx.strokeStyle = config.barColor;
+            ctx.fillStyle = conf.barColor;
+            ctx.strokeStyle = conf.barColor;
 
             for (let row = 0; row < roundedRows; row++) {
                 const rowCenterY = effectiveRowHeight * (row + 0.5);
-                const configRowIndex = Math.floor(row * config.waveRows / (effectiveRows || 1) * (localHeight / (localHeight || 1)));
-                // Note: configRowIndex mapping is tricky, but keeping it proportional to the config.waveRows
+                const configRowIndex = Math.floor(row * conf.waveRows / (effectiveRows || 1) * (localHeight / (localHeight || 1)));
 
                 for (let bar = 0; bar < roundedBars; bar++) {
                     const x = barSpacing * (bar + 0.5);
-                    const barWidth = getBarThickness(x, rowCenterY, configRowIndex, time, localWidth, localHeight, localMouseX, localMouseInCanvas);
+                    const barWidth = getBarThickness(x, rowCenterY, configRowIndex, time, localWidth, localHeight, localMouseX, localMouseInCanvas, conf);
 
-                    if (config.shapeMode === 'balls') {
+                    if (conf.shapeMode === 'balls') {
                         ctx.beginPath();
                         ctx.arc(x, rowCenterY, barWidth / 2, 0, Math.PI * 2);
-                        if (config.strokeOnly) {
-                            ctx.lineWidth = (barWidth / config.maxBarWidth) * config.strokeWidth;
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
                             ctx.stroke();
                         } else {
                             ctx.fill();
                         }
-                    } else if (config.shapeMode === 'squares') {
-                        if (config.strokeOnly) {
-                            ctx.lineWidth = (barWidth / config.maxBarWidth) * config.strokeWidth;
+                    } else if (conf.shapeMode === 'squares') {
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
                             ctx.strokeRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
                         } else {
                             ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
@@ -151,8 +155,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         const topStart = Math.round(row * effectiveRowHeight);
                         const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
-                        // Add +1 bleed to width and height to cover sub-pixel gaps
-                        ctx.fillRect(Math.round(x - barWidth / 2), topStart, Math.round(barWidth) + 1, bottomEnd - topStart + 1);
+                        // Removing Math.round from horizontal to restore smooth animation
+                        ctx.fillRect(x - barWidth / 2, topStart, barWidth + 1, bottomEnd - topStart + 1);
                     }
                 }
             }
@@ -166,11 +170,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const unitH = config.duplicateModeActive ? canvas.height / config.gridRows : canvas.height;
 
             const referenceSize = 800;
-            const barsPerUnit = (config.barsPerRow / referenceSize) * unitW;
-            const rowsPerUnit = (config.waveRows / referenceSize) * unitH;
+            let barsPerUnit = (config.barsPerRow / referenceSize) * unitW;
+            let rowsPerUnit = (config.waveRows / referenceSize) * unitH;
+
+            if (config.snapToGrid) {
+                const globalUnit = referenceSize / config.barsPerRow;
+                barsPerUnit = unitW / globalUnit;
+                rowsPerUnit = unitH / globalUnit;
+            }
 
             if (!config.duplicateModeActive) {
-                drawWaveInstance(canvas.width, canvas.height, 0, mouseX, mouseY, mouseInCanvas, barsPerUnit, rowsPerUnit);
+                drawWaveInstance(canvas.width, canvas.height, 0, mouseX, mouseY, mouseInCanvas, barsPerUnit, rowsPerUnit, config);
                 return;
             }
 
@@ -199,11 +209,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     localX >= 0 && localX <= cellW &&
                     localY >= 0 && localY <= cellH;
 
+                // Resolve instance configuration by merging global attributes with local overrides
+                // NOTE: If adding/removing global settings in future, ensure these instance overrides are updated to match
+                const instanceConfig = { ...config, ...item };
+
                 ctx.beginPath();
                 ctx.rect(0, 0, cellW + 1, cellH + 1);
                 ctx.clip();
 
-                drawWaveInstance(cellW + 1, cellH + 1, item.rotation, localX, localY, localMouseInCanvas, barsPerUnit * item.cs, rowsPerUnit * item.rs);
+                drawWaveInstance(cellW + 1, cellH + 1, item.rotation, localX, localY, localMouseInCanvas, (instanceConfig.barsPerRow / referenceSize) * unitW * item.cs, (instanceConfig.waveRows / referenceSize) * unitH * item.rs, instanceConfig);
                 ctx.restore();
             });
         }

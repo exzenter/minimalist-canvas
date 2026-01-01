@@ -12,6 +12,8 @@ import {
     SelectControl,
     Button,
     Popover,
+    Modal,
+    ColorPicker,
 } from '@wordpress/components';
 import { useState, useEffect, useRef } from '@wordpress/element';
 
@@ -24,11 +26,14 @@ export default function Edit({ attributes, setAttributes }) {
         rowPeakOffset, alternateDirection, combineOffsets,
         mouseAmplitude, amplitudeStrength,
         duplicateModeActive, gridRows, gridCols, gridConfig,
-        enableMixBlend, mixBlendMode, animationDirection
+        enableMixBlend, mixBlendMode, animationDirection,
+        snapToGrid
     } = attributes;
 
-    const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-    const togglePopover = () => setIsPopoverOpen(!isPopoverOpen);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [activeCellIndex, setActiveCellIndex] = useState(null); // Index in gridConfig or -1
+
+    const toggleModal = () => setIsModalOpen(!isModalOpen);
 
     useEffect(() => {
         // Filter out unreachable cells when grid size changes
@@ -61,24 +66,62 @@ export default function Edit({ attributes, setAttributes }) {
         updateGridConfig(newConfig);
     };
 
-    const mergeCell = (r, c, direction) => {
-        const index = gridConfig.findIndex(i => i.r === r && i.c === c);
+    const mergeCell = (index, direction) => {
         if (index === -1) return;
         let newConfig = [...gridConfig];
         const item = { ...newConfig[index] };
-        if (direction === 'right') {
-            item.cs += 1;
-        } else {
-            item.rs += 1;
-        }
+
+        if (direction === 'right') item.cs += 1;
+        else if (direction === 'down') item.rs += 1;
+        else if (direction === 'left') { item.c -= 1; item.cs += 1; }
+        else if (direction === 'up') { item.r -= 1; item.rs += 1; }
+
         newConfig[index] = item;
         // Remove any other cells that are now covered
-        newConfig = newConfig.filter(i => {
-            if (i.r === r && i.c === c) return true;
+        newConfig = newConfig.filter((i, idx) => {
+            if (idx === index) return true;
             const inR = i.r >= item.r && i.r < item.r + item.rs;
             const inC = i.c >= item.c && i.c < item.c + item.cs;
             return !(inR && inC);
         });
+        updateGridConfig(newConfig);
+    };
+
+    const moveCell = (index, dr, dc) => {
+        if (index === -1) return;
+        let newConfig = [...gridConfig];
+        const item = { ...newConfig[index] };
+
+        const newR = item.r + dr;
+        const newC = item.c + dc;
+
+        if (newR < 0 || newR + item.rs > gridRows || newC < 0 || newC + item.cs > gridCols) return;
+
+        // Check if destination is blocked by another active cell
+        const blocked = newConfig.some((i, idx) => {
+            if (idx === index || !i.isActive) return false;
+            const overlapR = Math.max(newR, i.r) < Math.min(newR + item.rs, i.r + i.rs);
+            const overlapC = Math.max(newC, i.c) < Math.min(newC + item.cs, i.c + i.cs);
+            return overlapR && overlapC;
+        });
+
+        if (blocked) return;
+
+        item.r = newR;
+        item.c = newC;
+        newConfig[index] = item;
+        updateGridConfig(newConfig);
+    };
+
+    const setInstanceOverride = (index, key, value) => {
+        let newConfig = [...gridConfig];
+        const item = { ...newConfig[index] };
+        if (value === undefined || value === null) {
+            delete item[key];
+        } else {
+            item[key] = value;
+        }
+        newConfig[index] = item;
         updateGridConfig(newConfig);
     };
 
@@ -100,11 +143,13 @@ export default function Edit({ attributes, setAttributes }) {
             for (let c = 0; c < gridCols; c++) {
                 if (occupied.has(`${r}-${c}`)) continue;
 
-                const item = gridConfig.find(i => i.r === r && i.c === c);
+                const cellIndex = gridConfig.findIndex(i => i.r === r && i.c === c);
+                const item = cellIndex > -1 ? gridConfig[cellIndex] : null;
                 const isActive = item?.isActive;
                 const rotation = item?.rotation || 0;
                 const rs = item?.rs || 1;
                 const cs = item?.cs || 1;
+                const isSelected = activeCellIndex === cellIndex && cellIndex !== -1;
 
                 cells.push(
                     <div
@@ -112,59 +157,184 @@ export default function Edit({ attributes, setAttributes }) {
                         style={{
                             gridRow: `span ${rs}`,
                             gridColumn: `span ${cs}`,
-                            background: isActive ? '#007cba' : '#fff',
-                            border: '1px solid #ccc',
+                            background: isActive ? (isSelected ? '#005a87' : '#007cba') : '#fff',
+                            border: isSelected ? '2px solid #ffad00' : '1px solid #ccc',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: 'pointer',
-                            minHeight: '60px',
+                            minHeight: '80px',
                             color: isActive ? '#fff' : '#000',
-                            position: 'relative'
+                            position: 'relative',
+                            boxShadow: isSelected ? '0 0 10px rgba(255,173,0,0.5)' : 'none',
+                            zIndex: isSelected ? 10 : 1
                         }}
-                        onClick={() => toggleCell(r, c)}
+                        onClick={() => {
+                            if (isActive) {
+                                setActiveCellIndex(cellIndex);
+                            } else {
+                                toggleCell(r, c);
+                                setActiveCellIndex(gridConfig.length); // Next available index
+                            }
+                        }}
                     >
                         {isActive ? (
-                            <div style={{ padding: '2px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '10px', marginBottom: '4px' }}>{rotation}°</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
-                                    <Button
-                                        isSmall
-                                        icon="redo"
-                                        onClick={(e) => { e.stopPropagation(); rotateCell(r, c); }}
-                                        label={__('Rotate', 'minimalist')}
-                                    />
-                                    <Button
-                                        isSmall
-                                        icon="remove"
-                                        onClick={(e) => { e.stopPropagation(); toggleCell(r, c); }}
-                                        label={__('Remove', 'minimalist')}
-                                    />
-                                    <Button
-                                        isSmall
-                                        icon="arrow-right-alt"
-                                        onClick={(e) => { e.stopPropagation(); mergeCell(r, c, 'right'); }}
-                                        disabled={c + cs >= gridCols}
-                                        label={__('Merge Right', 'minimalist')}
-                                    />
-                                    <Button
-                                        isSmall
-                                        icon="arrow-down-alt"
-                                        onClick={(e) => { e.stopPropagation(); mergeCell(r, c, 'down'); }}
-                                        disabled={r + rs >= gridRows}
-                                        label={__('Merge Down', 'minimalist')}
-                                    />
+                            <div style={{ padding: '4px', textAlign: 'center', width: '100%' }}>
+                                <div style={{ fontSize: '10px', marginBottom: '4px', fontWeight: 'bold' }}>
+                                    {rotation}° {isSelected ? `[${__('Selected', 'minimalist')}]` : ''}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2px' }}>
+                                    <Button isSmall icon="redo" onClick={(e) => { e.stopPropagation(); rotateCell(r, c); }} label={__('Rotate', 'minimalist')} />
+                                    <Button isSmall icon="remove" onClick={(e) => { e.stopPropagation(); toggleCell(r, c); setActiveCellIndex(null); }} label={__('Remove', 'minimalist')} />
+                                    <Button isSmall icon="move" onClick={(e) => { e.stopPropagation(); }} label={__('Move', 'minimalist')} />
+                                    <div />
+
+                                    <Button isSmall icon="arrow-left-alt" onClick={(e) => { e.stopPropagation(); mergeCell(cellIndex, 'left'); }} disabled={c === 0} label={__('Merge Left', 'minimalist')} />
+                                    <Button isSmall icon="arrow-right-alt" onClick={(e) => { e.stopPropagation(); mergeCell(cellIndex, 'right'); }} disabled={c + cs >= gridCols} label={__('Merge Right', 'minimalist')} />
+                                    <Button isSmall icon="arrow-up-alt" onClick={(e) => { e.stopPropagation(); mergeCell(cellIndex, 'up'); }} disabled={r === 0} label={__('Merge Up', 'minimalist')} />
+                                    <Button isSmall icon="arrow-down-alt" onClick={(e) => { e.stopPropagation(); mergeCell(cellIndex, 'down'); }} disabled={r + rs >= gridRows} label={__('Merge Down', 'minimalist')} />
+
+                                    <Button isSmall icon="arrow-left" onClick={(e) => { e.stopPropagation(); moveCell(cellIndex, 0, -1); }} disabled={c === 0} label={__('Move Left', 'minimalist')} />
+                                    <Button isSmall icon="arrow-right" onClick={(e) => { e.stopPropagation(); moveCell(cellIndex, 0, 1); }} disabled={c + cs >= gridCols} label={__('Move Right', 'minimalist')} />
+                                    <Button isSmall icon="arrow-up" onClick={(e) => { e.stopPropagation(); moveCell(cellIndex, -1, 0); }} disabled={r === 0} label={__('Move Up', 'minimalist')} />
+                                    <Button isSmall icon="arrow-down" onClick={(e) => { e.stopPropagation(); moveCell(cellIndex, 1, 0); }} disabled={r + rs >= gridRows} label={__('Move Down', 'minimalist')} />
                                 </div>
                             </div>
                         ) : (
-                            <div style={{ fontSize: '18px', opacity: 0.3 }}>+</div>
+                            <div style={{ fontSize: '24px', opacity: 0.3 }}>+</div>
                         )}
                     </div>
                 );
             }
         }
         return cells;
+    };
+
+    const renderInstanceSettings = () => {
+        const item = gridConfig[activeCellIndex];
+        if (!item) return null;
+
+        const renderOverrideControl = (label, key, Control, props) => {
+            const isOverridden = item[key] !== undefined;
+            const value = isOverridden ? item[key] : attributes[key];
+
+            return (
+                <div style={{ marginBottom: '15px', border: isOverridden ? '1px solid #787c82' : '1px transparent', padding: '5px', borderRadius: '4px', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ flex: 1 }}>
+                            <Control
+                                label={label}
+                                value={value}
+                                {...props}
+                                onChange={(val) => setInstanceOverride(activeCellIndex, key, val)}
+                            />
+                        </div>
+                        {isOverridden && (
+                            <Button
+                                icon="undo"
+                                isSmall
+                                onClick={() => setInstanceOverride(activeCellIndex, key, undefined)}
+                                label={__('Reset to Global', 'minimalist')}
+                                style={{ marginLeft: '10px' }}
+                            />
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const renderColorOverride = (label, key) => {
+            const isOverridden = item[key] !== undefined;
+            const value = isOverridden ? item[key] : attributes[key];
+
+            return (
+                <div style={{ marginBottom: '15px', border: isOverridden ? '1px solid #787c82' : '1px transparent', padding: '5px', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '500' }}>{label}</span>
+                        {isOverridden && (
+                            <Button
+                                icon="undo"
+                                isSmall
+                                onClick={() => setInstanceOverride(activeCellIndex, key, undefined)}
+                                label={__('Reset to Global', 'minimalist')}
+                            />
+                        )}
+                    </div>
+                    {/* Proper alpha-aware color selector for modal */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <ColorPicker
+                            color={value}
+                            onChange={(val) => setInstanceOverride(activeCellIndex, key, val)}
+                            enableAlpha
+                            copyFormat="rgba"
+                        />
+                    </div>
+                </div>
+            );
+        };
+
+        return (
+            <div>
+                <h3>{__('Instance Overrides', 'minimalist')}</h3>
+                <p style={{ fontSize: '11px', color: '#666', borderBottom: '1px solid #eee', pb: '10px' }}>
+                    {__('Settings here apply ONLY to the selected instance. Blue borders indicate overrides.', 'minimalist')}
+                </p>
+
+                {/* Structure matches InspectorControls order as requested */}
+
+                {/* 1. Wave Structure */}
+                {/* NOTE: If adding/removing global settings in future, ensure these instance overrides are updated to match */}
+                <div style={{ borderBottom: '1px solid #eee', mb: '15px', pt: '10px' }}>
+                    <h4>{__('Wave Structure', 'minimalist')}</h4>
+                    {renderOverrideControl(__('Shape Mode', 'minimalist'), 'shapeMode', SelectControl, {
+                        options: [
+                            { label: 'Bars', value: 'bars' },
+                            { label: 'Balls (Circles)', value: 'balls' },
+                            { label: 'Squares', value: 'squares' },
+                        ]
+                    })}
+                    {renderOverrideControl(__('Stroke Only', 'minimalist'), 'strokeOnly', ToggleControl, { checked: item.strokeOnly !== undefined ? item.strokeOnly : attributes.strokeOnly })}
+                    {renderOverrideControl(__('Wave Rows', 'minimalist'), 'waveRows', RangeControl, { min: 1, max: 100 })}
+                    {renderOverrideControl(__('Bars per Row', 'minimalist'), 'barsPerRow', RangeControl, { min: 10, max: 100 })}
+                    {renderOverrideControl(__('Min Bar Width', 'minimalist'), 'minBarWidth', RangeControl, { min: 0.1, max: 50, step: 0.1 })}
+                    {renderOverrideControl(__('Max Bar Width', 'minimalist'), 'maxBarWidth', RangeControl, { min: 0.1, max: 50, step: 0.1 })}
+                </div>
+
+                {/* 2. Colors */}
+                <div style={{ borderBottom: '1px solid #eee', mb: '15px', pt: '10px' }}>
+                    <h4>{__('Colors', 'minimalist')}</h4>
+                    {renderColorOverride(__('Bar Color', 'minimalist'), 'barColor')}
+                </div>
+
+                {/* 3. Animation */}
+                <div style={{ borderBottom: '1px solid #eee', mb: '15px', pt: '10px' }}>
+                    <h4>{__('Animation', 'minimalist')}</h4>
+                    {renderOverrideControl(__('Animate Bar Thickness', 'minimalist'), 'animateThickness', ToggleControl, { checked: item.animateThickness !== undefined ? item.animateThickness : attributes.animateThickness })}
+                    {renderOverrideControl(__('Speed', 'minimalist'), 'thicknessSpeed', RangeControl, { min: 0.01, max: 8, step: 0.01 })}
+                    {(item.shapeMode || attributes.shapeMode) !== 'bars' && renderOverrideControl(__('Animation Direction', 'minimalist'), 'animationDirection', RangeControl, { min: 0, max: 360 })}
+                    {renderOverrideControl(__('Wave Length', 'minimalist'), 'waveLength', RangeControl, { min: 0.01, max: 20, step: 0.01 })}
+                    {renderOverrideControl(__('Cutoff', 'minimalist'), 'thicknessCutoff', RangeControl, { min: 0, max: 100 })}
+                    {renderOverrideControl(__('Trail Cutoff', 'minimalist'), 'trailCutoff', RangeControl, { min: -100, max: 100 })}
+                    {renderOverrideControl(__('Row Peak Offset', 'minimalist'), 'rowPeakOffset', RangeControl, { min: 0, max: 6.28, step: 0.01 })}
+                    {renderOverrideControl(__('Alternate Row Direction', 'minimalist'), 'alternateDirection', ToggleControl, { checked: item.alternateDirection !== undefined ? item.alternateDirection : attributes.alternateDirection })}
+                </div>
+
+                {/* 4. Advanced Effects */}
+                <div style={{ mb: '15px', pt: '10px' }}>
+                    <h4>{__('Advanced Effects', 'minimalist')}</h4>
+                    {renderOverrideControl(__('Enable Mix Blend Mode', 'minimalist'), 'enableMixBlend', ToggleControl, { checked: item.enableMixBlend !== undefined ? item.enableMixBlend : attributes.enableMixBlend })}
+                    {renderOverrideControl(__('Blend Mode', 'minimalist'), 'mixBlendMode', SelectControl, {
+                        options: [
+                            { label: 'Normal', value: 'normal' },
+                            { label: 'Multiply', value: 'multiply' },
+                            { label: 'Screen', value: 'screen' },
+                            { label: 'Overlay', value: 'overlay' },
+                        ]
+                    })}
+                </div>
+            </div>
+        );
     };
 
     const canvasRef = useRef(null);
@@ -205,13 +375,18 @@ export default function Edit({ attributes, setAttributes }) {
 
             if (!conf.animateThickness) return baseThickness;
 
-            // Project coordinates onto animation direction vector
-            const angleRad = (conf.animationDirection || 0) * Math.PI / 180;
-            const dirX = Math.cos(angleRad);
-            const dirY = Math.sin(angleRad);
+            let projectedPos;
+            if (conf.shapeMode === 'bars') {
+                projectedPos = x / localWidth;
+            } else {
+                // Project coordinates onto animation direction vector
+                const angleRad = (conf.animationDirection || 0) * Math.PI / 180;
+                const dirX = Math.cos(angleRad);
+                const dirY = Math.sin(angleRad);
 
-            // Normalized projection
-            const projectedPos = (x * dirX + y * dirY) / (localWidth * Math.abs(dirX) + localHeight * Math.abs(dirY) || 1);
+                // Normalized projection
+                projectedPos = (x * dirX + y * dirY) / (localWidth * Math.abs(dirX) + localHeight * Math.abs(dirY) || 1);
+            }
 
             const direction = rowAlternate && (rowIndex % 2 !== 0) ? -1 : 1;
 
@@ -306,8 +481,8 @@ export default function Edit({ attributes, setAttributes }) {
                     } else {
                         const topStart = Math.round(row * effectiveRowHeight);
                         const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
-                        // Add +1 bleed to width and height to cover sub-pixel gaps
-                        ctx.fillRect(Math.round(x - barWidth / 2), topStart, Math.round(barWidth) + 1, bottomEnd - topStart + 1);
+                        // Removing Math.round from horizontal to restore smooth animation
+                        ctx.fillRect(x - barWidth / 2, topStart, barWidth + 1, bottomEnd - topStart + 1);
                     }
                 }
             }
@@ -324,8 +499,14 @@ export default function Edit({ attributes, setAttributes }) {
             const unitH = conf.duplicateModeActive ? canvas.height / conf.gridRows : canvas.height;
 
             const referenceSize = 800;
-            const barsPerUnit = (conf.barsPerRow / referenceSize) * unitW;
-            const rowsPerUnit = (conf.waveRows / referenceSize) * unitH;
+            let barsPerUnit = (conf.barsPerRow / referenceSize) * unitW;
+            let rowsPerUnit = (conf.waveRows / referenceSize) * unitH;
+
+            if (conf.snapToGrid) {
+                const globalUnit = referenceSize / conf.barsPerRow;
+                barsPerUnit = unitW / globalUnit;
+                rowsPerUnit = unitH / globalUnit;
+            }
 
             if (!conf.duplicateModeActive) {
                 drawWaveInstance(canvas.width, canvas.height, mX, mY, mActive, conf, barsPerUnit, rowsPerUnit);
@@ -359,15 +540,27 @@ export default function Edit({ attributes, setAttributes }) {
                     ctx.rect(0, 0, cellW + 1, cellH + 1);
                     ctx.clip();
 
-                    drawWaveInstance(cellW + 1, cellH + 1, localX, localY, localMouseInCanvas, conf, barsPerUnit * item.cs, rowsPerUnit * item.rs);
+                    const instanceConfig = { ...conf, ...item };
+                    drawWaveInstance(
+                        cellW + 1,
+                        cellH + 1,
+                        localX,
+                        localY,
+                        localMouseInCanvas,
+                        instanceConfig,
+                        (instanceConfig.barsPerRow / referenceSize) * unitW * item.cs,
+                        (instanceConfig.waveRows / referenceSize) * unitH * item.rs
+                    );
                     ctx.restore();
                 });
             }
         }
 
         function animate() {
-            time += 0.016;
-            draw();
+            if (attrRef.current.liveViewActive) {
+                time += 0.016;
+                draw();
+            }
             animationFrame = requestAnimationFrame(animate);
         }
 
@@ -398,6 +591,12 @@ export default function Edit({ attributes, setAttributes }) {
         <>
             <InspectorControls>
                 <PanelBody title={__('Wave Structure', 'minimalist')}>
+                    <ToggleControl
+                        label={__('Snap Shapes to Grid', 'minimalist')}
+                        help={__('Ensures shapes align perfectly between different cells, especially when rotated.', 'minimalist')}
+                        checked={snapToGrid}
+                        onChange={(val) => setAttributes({ snapToGrid: val })}
+                    />
                     <SelectControl
                         label={__('Shape Mode', 'minimalist')}
                         value={shapeMode}
@@ -469,7 +668,7 @@ export default function Edit({ attributes, setAttributes }) {
                             value: bgColor,
                             onChange: (val) => setAttributes({ bgColor: val }),
                             label: __('Background Color', 'minimalist'),
-                            // Background usually doesn't need alpha for the block itself, but can be enabled
+                            __experimentalHasAlphaSupport: true,
                         },
                         {
                             value: barColor,
@@ -547,14 +746,16 @@ export default function Edit({ attributes, setAttributes }) {
                                 max={6.28}
                                 step={0.01}
                             />
-                            <RangeControl
-                                label={__('Animation Direction', 'minimalist')}
-                                hideHTML5Control={true}
-                                value={animationDirection}
-                                onChange={(val) => setAttributes({ animationDirection: val })}
-                                min={0}
-                                max={360}
-                            />
+                            {shapeMode !== 'bars' && (
+                                <RangeControl
+                                    label={__('Animation Direction', 'minimalist')}
+                                    hideHTML5Control={true}
+                                    value={animationDirection}
+                                    onChange={(val) => setAttributes({ animationDirection: val })}
+                                    min={0}
+                                    max={360}
+                                />
+                            )}
                             <RangeControl
                                 label={__('Wave Length', 'minimalist')}
                                 value={waveLength}
@@ -648,36 +849,52 @@ export default function Edit({ attributes, setAttributes }) {
                             />
                             <Button
                                 isPrimary
-                                onClick={togglePopover}
+                                onClick={toggleModal}
                                 style={{ width: '100%', justifyContent: 'center' }}
                             >
-                                {__('Edit Layout', 'minimalist')}
+                                {__('Edit Layout & Instances', 'minimalist')}
                             </Button>
-                            {isPopoverOpen && (
-                                <Popover
-                                    onClose={togglePopover}
-                                    position="bottom center"
-                                    className="minimalist-layout-popover"
+                            {isModalOpen && (
+                                <Modal
+                                    title={__('Duplicate Mode Editor', 'minimalist')}
+                                    onRequestClose={toggleModal}
+                                    style={{ width: '90vw', maxWidth: '1200px' }}
+                                    className="minimalist-layout-modal"
                                 >
-                                    <div style={{ padding: '20px', minWidth: '300px' }}>
-                                        <h3>{__('Visual Layout Editor', 'minimalist')}</h3>
-                                        <div style={{
-                                            display: 'grid',
-                                            gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-                                            gridTemplateRows: `repeat(${gridRows}, 1fr)`,
-                                            gap: '5px',
-                                            aspectRatio: `${gridCols}/${gridRows}`,
-                                            background: '#f0f0f0',
-                                            padding: '5px',
-                                            borderRadius: '4px'
-                                        }}>
-                                            {renderGridEditor()}
+                                    <div style={{ display: 'flex', height: '100%', gap: '20px' }}>
+                                        {/* Left Panel: Grid Layout */}
+                                        <div style={{ flex: '1', minWidth: '300px' }}>
+                                            <h3>{__('Visual Layout Editor', 'minimalist')}</h3>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+                                                gridTemplateRows: `repeat(${gridRows}, 1fr)`,
+                                                gap: '5px',
+                                                aspectRatio: `${gridCols}/${gridRows}`,
+                                                background: '#f0f0f0',
+                                                padding: '5px',
+                                                borderRadius: '4px',
+                                                marginBottom: '15px'
+                                            }}>
+                                                {renderGridEditor()}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#666' }}>
+                                                {__('Click cells to select/activate. Use controls to rotate, merge, or move.', 'minimalist')}
+                                            </div>
                                         </div>
-                                        <div style={{ marginTop: '15px', fontSize: '12px', color: '#666' }}>
-                                            {__('Click cells to toggle. Use controls in cell to rotate or merge.', 'minimalist')}
+
+                                        {/* Right Panel: Instance Overrides */}
+                                        <div style={{ flex: '1', padding: '10px', borderLeft: '1px solid #ddd', overflowY: 'auto', maxHeight: '70vh' }}>
+                                            {activeCellIndex !== null && activeCellIndex !== -1 ? (
+                                                renderInstanceSettings()
+                                            ) : (
+                                                <div style={{ padding: '40px', textAlign: 'center', opacity: 0.5 }}>
+                                                    {__('Select an active cell to edit its specific settings.', 'minimalist')}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                </Popover>
+                                </Modal>
                             )}
                         </>
                     )}
