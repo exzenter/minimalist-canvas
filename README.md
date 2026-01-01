@@ -1,4 +1,4 @@
-# Minimalist Wave Canvas
+# Minimalist Canvas
 
 A WordPress Gutenberg block featuring an animated wave canvas background with highly customizable parameters.
 

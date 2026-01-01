@@ -166,8 +166,222 @@ export default function Edit({ attributes, setAttributes }) {
         return cells;
     };
 
+    const canvasRef = useRef(null);
+    const attrRef = useRef(attributes);
+    const mouseRef = useRef({ x: 0, y: 0, active: false });
+
+    useEffect(() => {
+        attrRef.current = attributes;
+    }, [attributes]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        let time = 0;
+        let animationFrame;
+
+        function initCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+
+        const resizeObserver = new ResizeObserver(initCanvas);
+        resizeObserver.observe(canvas.parentElement);
+        initCanvas();
+
+        function getBarThickness(x, rowIndex, currentTime, localWidth, localMouseX, localMouseInCanvas, conf) {
+            const rowMinWidth = conf.minBarWidth;
+            const rowMaxWidth = conf.maxBarWidth;
+            const rowSpeed = conf.thicknessSpeed;
+            const rowOffset = conf.thicknessOffset;
+            const rowAlternate = conf.alternateDirection;
+
+            const baseThickness = (rowMinWidth + rowMaxWidth) / 2;
+            const thicknessRange = (rowMaxWidth - rowMinWidth) / 2;
+
+            if (!conf.animateThickness) return baseThickness;
+
+            const normalizedX = x / localWidth;
+            const direction = rowAlternate && (rowIndex % 2 !== 0) ? -1 : 1;
+
+            let rowSpecificOffset = rowOffset;
+            if (conf.combineOffsets && rowIndex > 0) {
+                rowSpecificOffset += (rowIndex * Math.PI) / conf.waveRows;
+            } else {
+                rowSpecificOffset += rowIndex * conf.rowPeakOffset;
+            }
+
+            const phase = normalizedX * Math.PI * conf.waveLength + currentTime * rowSpeed * direction + rowSpecificOffset;
+
+            let waveValue;
+            switch (conf.animationMode) {
+                case 'pingpong':
+                    waveValue = Math.abs(Math.sin(phase)) * 2 - 1;
+                    break;
+                case 'reset':
+                    const sawPhase = (phase % (Math.PI * 2)) / (Math.PI * 2);
+                    waveValue = Math.sin(sawPhase * Math.PI * 2);
+                    break;
+                default:
+                    waveValue = Math.sin(phase);
+            }
+
+            if (conf.thicknessCutoff > 0) {
+                const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
+                if (cyclePhase > (1 - conf.thicknessCutoff / 100)) return rowMinWidth;
+            }
+
+            if (conf.trailCutoff !== 0) {
+                const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
+                const startPoint = conf.trailCutoffStart / 100;
+                const trailAmount = Math.abs(conf.trailCutoff) / 100 * 0.5;
+                if (conf.trailCutoff > 0) {
+                    if (cyclePhase > startPoint && cyclePhase < startPoint + trailAmount) return rowMinWidth;
+                } else {
+                    const leadStart = startPoint - trailAmount;
+                    if (cyclePhase > leadStart && cyclePhase < startPoint) return rowMinWidth;
+                }
+            }
+
+            let thickness = baseThickness + waveValue * thicknessRange;
+
+            if (conf.mouseAmplitude && localMouseInCanvas) {
+                const dx = x - localMouseX;
+                const dist = Math.abs(dx);
+                const maxDist = localWidth * 0.3;
+                const influence = Math.max(0, 1 - dist / maxDist);
+                thickness += influence * thicknessRange * (conf.amplitudeStrength - 1);
+            }
+
+            return Math.max(rowMinWidth, Math.min(rowMaxWidth, thickness));
+        }
+
+        function drawWaveInstance(localWidth, localHeight, localMouseX, localMouseY, localMouseInCanvas, conf) {
+            ctx.save();
+            const referenceSize = 800;
+            const barsPerPixel = conf.barsPerRow / referenceSize;
+            const rowsPerPixel = conf.waveRows / referenceSize;
+
+            const effectiveBarsPerRow = Math.round(localWidth * barsPerPixel);
+            const effectiveWaveRows = Math.round(localHeight * rowsPerPixel);
+
+            const effectiveRowHeight = localHeight / effectiveWaveRows;
+            const barSpacing = localWidth / effectiveBarsPerRow;
+
+            ctx.fillStyle = conf.barColor;
+            ctx.strokeStyle = conf.barColor;
+
+            for (let row = 0; row < effectiveWaveRows; row++) {
+                const rowCenterY = effectiveRowHeight * (row + 0.5);
+                const configRowIndex = Math.floor(row * conf.waveRows / effectiveWaveRows);
+
+                for (let bar = 0; bar < effectiveBarsPerRow; bar++) {
+                    const x = barSpacing * (bar + 0.5);
+                    const barWidth = getBarThickness(x, configRowIndex, time, localWidth, localMouseX, localMouseInCanvas, conf);
+
+                    if (conf.shapeMode === 'balls') {
+                        ctx.beginPath();
+                        ctx.arc(x, rowCenterY, barWidth / 2, 0, Math.PI * 2);
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.stroke();
+                        } else {
+                            ctx.fill();
+                        }
+                    } else if (conf.shapeMode === 'squares') {
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.strokeRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
+                        } else {
+                            ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
+                        }
+                    } else {
+                        const topStart = Math.round(row * effectiveRowHeight);
+                        const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
+                        ctx.fillRect(x - barWidth / 2, topStart, barWidth, bottomEnd - topStart);
+                    }
+                }
+            }
+            ctx.restore();
+        }
+
+        function draw() {
+            const conf = attrRef.current;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const { x: mX, y: mY, active: mActive } = mouseRef.current;
+
+            if (!conf.duplicateModeActive) {
+                drawWaveInstance(canvas.width, canvas.height, mX, mY, mActive, conf);
+            } else {
+                const unitW = canvas.width / conf.gridCols;
+                const unitH = canvas.height / conf.gridRows;
+
+                conf.gridConfig.forEach(item => {
+                    if (!item.isActive) return;
+
+                    const cellX = item.c * unitW;
+                    const cellY = item.r * unitH;
+                    const cellW = item.cs * unitW;
+                    const cellH = item.rs * unitH;
+
+                    ctx.save();
+                    ctx.translate(cellX + cellW / 2, cellY + cellH / 2);
+                    ctx.rotate(item.rotation * Math.PI / 180);
+                    ctx.translate(-cellW / 2, -cellH / 2);
+
+                    const angle = -item.rotation * Math.PI / 180;
+                    const cx = cellX + cellW / 2;
+                    const cy = cellY + cellH / 2;
+                    const rx = mX - cx;
+                    const ry = mY - cy;
+                    const localX = rx * Math.cos(angle) - ry * Math.sin(angle) + cellW / 2;
+                    const localY = rx * Math.sin(angle) + ry * Math.cos(angle) + cellH / 2;
+
+                    const localMouseInCanvas = mActive &&
+                        localX >= 0 && localX <= cellW &&
+                        localY >= 0 && localY <= cellH;
+
+                    ctx.beginPath();
+                    ctx.rect(0, 0, cellW, cellH);
+                    ctx.clip();
+
+                    drawWaveInstance(cellW, cellH, localX, localY, localMouseInCanvas, conf);
+                    ctx.restore();
+                });
+            }
+        }
+
+        function animate() {
+            time += 0.016;
+            draw();
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        return () => {
+            cancelAnimationFrame(animationFrame);
+            resizeObserver.disconnect();
+        };
+    }, []);
+
     const blockProps = useBlockProps({
-        style: { backgroundColor: bgColor, position: 'relative', overflow: 'hidden' }
+        style: { backgroundColor: bgColor, position: 'relative', overflow: 'hidden' },
+        onMouseMove: (e) => {
+            const rect = canvasRef.current.getBoundingClientRect();
+            mouseRef.current = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                active: true
+            };
+        },
+        onMouseLeave: () => {
+            mouseRef.current.active = false;
+        }
     });
 
     return (
@@ -394,7 +608,6 @@ export default function Edit({ attributes, setAttributes }) {
                                 >
                                     <div style={{ padding: '20px', minWidth: '300px' }}>
                                         <h3>{__('Visual Layout Editor', 'minimalist')}</h3>
-                                        {/* Grid Editor Implementation will go here */}
                                         <div style={{
                                             display: 'grid',
                                             gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
@@ -419,43 +632,32 @@ export default function Edit({ attributes, setAttributes }) {
             </InspectorControls>
 
             <div {...blockProps}>
-                <div className="wp-block-minimalist-wave-canvas-background"
+                <canvas
+                    ref={canvasRef}
+                    className="minimalist-canvas-element"
                     style={{
                         position: 'absolute',
                         top: 0, left: 0, width: '100%', height: '100%',
-                        zIndex: 0, pointerEvents: 'none',
-                        display: duplicateModeActive ? 'grid' : 'block',
-                        gridTemplateColumns: duplicateModeActive ? `repeat(${gridCols}, 1fr)` : 'none',
-                        gridTemplateRows: duplicateModeActive ? `repeat(${gridRows}, 1fr)` : 'none',
-                        gap: duplicateModeActive ? '1px' : '0',
-                        backgroundColor: bgColor
+                        zIndex: 0, pointerEvents: 'none'
                     }}
-                >
-                    {duplicateModeActive ? (
-                        gridConfig.filter(i => i.isActive).map((item, idx) => (
-                            <div key={idx} style={{
-                                gridRow: `${item.r + 1} / span ${item.rs}`,
-                                gridColumn: `${item.c + 1} / span ${item.cs}`,
-                                border: '1px dashed rgba(0,0,0,0.1)',
-                                background: 'rgba(255,255,255,0.05)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transform: `rotate(${item.rotation}deg)`,
-                                fontSize: '10px',
-                                color: barColor,
-                                opacity: 0.3
-                            }}>
-                                <span>{item.rotation}°</span>
-                            </div>
-                        ))
-                    ) : (
-                        <div style={{ padding: '20px', color: barColor, opacity: 0.5 }}>
-                            {__('Wave Canvas Background Active', 'minimalist')}
-                        </div>
-                    )}
-                </div>
-                <div className="wp-block-minimalist-wave-canvas-content" style={{ position: 'relative', zIndex: 1 }}>
+                />
+                {/* Visual grid guide in editor if duplicate mode is active */}
+                {duplicateModeActive && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 0, left: 0, width: '100%', height: '100%',
+                        zIndex: 1, pointerEvents: 'none',
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+                        gridTemplateRows: `repeat(${gridRows}, 1fr)`,
+                        opacity: 0.1
+                    }}>
+                        {Array.from({ length: gridRows * gridCols }).map((_, i) => (
+                            <div key={i} style={{ border: '1px dashed rgba(0,0,0,0.5)' }} />
+                        ))}
+                    </div>
+                )}
+                <div className="minimalist-canvas-content" style={{ position: 'relative', zIndex: 2 }}>
                     <InnerBlocks />
                 </div>
             </div>

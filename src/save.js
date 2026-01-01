@@ -4,7 +4,7 @@ export default function save({ attributes }) {
     const { bgColor } = attributes;
 
     const blockProps = useBlockProps.save({
-        className: 'wp-block-minimalist-wave-canvas',
+        className: 'wp-block-minimalist-canvas',
         style: { backgroundColor: bgColor },
         'data-config': JSON.stringify(attributes)
     });

@@ -3,7 +3,7 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const blocks = document.querySelectorAll('.wp-block-minimalist-wave-canvas');
+    const blocks = document.querySelectorAll('.wp-block-minimalist-canvas');
 
     blocks.forEach(block => {
         const canvas = block.querySelector('.minimalist-canvas-element');

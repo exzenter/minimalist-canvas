@@ -1,11 +1,11 @@
 {
     "$schema": "https://schemas.wp.org/trunk/block.json",
     "apiVersion": 3,
-    "name": "minimalist/wave-canvas",
+    "name": "minimalist/minimalist-canvas",
     "version": "1.0.0",
-    "title": "Wave Canvas Group",
+    "title": "Minimalist Canvas",
     "category": "design",
-    "icon": "waves",
+    "icon": "art",
     "description": "A group block with an animated wave canvas background.",
     "supports": {
         "html": false,
