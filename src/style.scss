@@ -1,0 +1,21 @@
+.wp-block-minimalist-wave-canvas {
+    position: relative;
+    overflow: hidden;
+    min-height: 100px; // Default height
+
+    .minimalist-canvas-element {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .minimalist-canvas-content {
+        position: relative;
+        z-index: 1;
+        // Inner content styling
+    }
+}

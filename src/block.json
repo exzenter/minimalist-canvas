@@ -1,0 +1,152 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "minimalist/wave-canvas",
+    "version": "1.0.0",
+    "title": "Wave Canvas Group",
+    "category": "design",
+    "icon": "waves",
+    "description": "A group block with an animated wave canvas background.",
+    "supports": {
+        "html": false,
+        "align": [
+            "wide",
+            "full"
+        ],
+        "spacing": {
+            "margin": true,
+            "padding": true,
+            "blockGap": true
+        },
+        "layout": {
+            "allowEditing": true
+        },
+        "color": {
+            "text": true,
+            "background": false
+        }
+    },
+    "attributes": {
+        "shapeMode": {
+            "type": "string",
+            "default": "bars"
+        },
+        "strokeOnly": {
+            "type": "boolean",
+            "default": false
+        },
+        "strokeWidth": {
+            "type": "number",
+            "default": 2
+        },
+        "waveRows": {
+            "type": "number",
+            "default": 3
+        },
+        "barsPerRow": {
+            "type": "number",
+            "default": 40
+        },
+        "minBarWidth": {
+            "type": "number",
+            "default": 3
+        },
+        "maxBarWidth": {
+            "type": "number",
+            "default": 12
+        },
+        "barCoverage": {
+            "type": "number",
+            "default": 100
+        },
+        "bgColor": {
+            "type": "string",
+            "default": "#e8e0d5"
+        },
+        "barColor": {
+            "type": "string",
+            "default": "#1a1a1a"
+        },
+        "animateThickness": {
+            "type": "boolean",
+            "default": true
+        },
+        "animationMode": {
+            "type": "string",
+            "default": "loop"
+        },
+        "thicknessSpeed": {
+            "type": "number",
+            "default": 2
+        },
+        "thicknessOffset": {
+            "type": "number",
+            "default": 0
+        },
+        "waveLength": {
+            "type": "number",
+            "default": 4
+        },
+        "thicknessCutoff": {
+            "type": "number",
+            "default": 0
+        },
+        "trailCutoff": {
+            "type": "number",
+            "default": 0
+        },
+        "trailCutoffStart": {
+            "type": "number",
+            "default": 25
+        },
+        "rowPeakOffset": {
+            "type": "number",
+            "default": 0
+        },
+        "alternateDirection": {
+            "type": "boolean",
+            "default": false
+        },
+        "combineOffsets": {
+            "type": "boolean",
+            "default": false
+        },
+        "mouseAmplitude": {
+            "type": "boolean",
+            "default": false
+        },
+        "amplitudeStrength": {
+            "type": "number",
+            "default": 2
+        },
+        "duplicateModeActive": {
+            "type": "boolean",
+            "default": false
+        },
+        "gridRows": {
+            "type": "number",
+            "default": 1
+        },
+        "gridCols": {
+            "type": "number",
+            "default": 1
+        },
+        "gridConfig": {
+            "type": "array",
+            "default": [
+                {
+                    "r": 0,
+                    "c": 0,
+                    "rs": 1,
+                    "cs": 1,
+                    "rotation": 0,
+                    "isActive": true
+                }
+            ]
+        }
+    },
+    "editorScript": "file:./index.js",
+    "editorStyle": "file:./index.css",
+    "style": "file:./style-index.css",
+    "viewScript": "file:./view.js"
+}
