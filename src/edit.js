@@ -299,7 +299,8 @@ export default function Edit({ attributes, setAttributes }) {
                     } else {
                         const topStart = Math.round(row * effectiveRowHeight);
                         const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
-                        ctx.fillRect(Math.round(x - barWidth / 2), topStart, Math.round(barWidth), bottomEnd - topStart);
+                        // Add +1 bleed to width and height to cover sub-pixel gaps
+                        ctx.fillRect(Math.round(x - barWidth / 2), topStart, Math.round(barWidth) + 1, bottomEnd - topStart + 1);
                     }
                 }
             }
@@ -348,10 +349,10 @@ export default function Edit({ attributes, setAttributes }) {
                         localY >= 0 && localY <= cellH;
 
                     ctx.beginPath();
-                    ctx.rect(0, 0, cellW, cellH);
+                    ctx.rect(0, 0, cellW + 1, cellH + 1);
                     ctx.clip();
 
-                    drawWaveInstance(cellW, cellH, localX, localY, localMouseInCanvas, conf, barsPerUnit * item.cs, rowsPerUnit * item.rs);
+                    drawWaveInstance(cellW + 1, cellH + 1, localX, localY, localMouseInCanvas, conf, barsPerUnit * item.cs, rowsPerUnit * item.rs);
                     ctx.restore();
                 });
             }

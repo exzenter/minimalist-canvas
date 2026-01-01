@@ -144,7 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         const topStart = Math.round(row * effectiveRowHeight);
                         const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
-                        ctx.fillRect(Math.round(x - barWidth / 2), topStart, Math.round(barWidth), bottomEnd - topStart);
+                        // Add +1 bleed to width and height to cover sub-pixel gaps
+                        ctx.fillRect(Math.round(x - barWidth / 2), topStart, Math.round(barWidth) + 1, bottomEnd - topStart + 1);
                     }
                 }
             }
@@ -192,10 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     localY >= 0 && localY <= cellH;
 
                 ctx.beginPath();
-                ctx.rect(0, 0, cellW, cellH);
+                ctx.rect(0, 0, cellW + 1, cellH + 1);
                 ctx.clip();
 
-                drawWaveInstance(cellW, cellH, item.rotation, localX, localY, localMouseInCanvas, barsPerUnit * item.cs, rowsPerUnit * item.rs);
+                drawWaveInstance(cellW + 1, cellH + 1, item.rotation, localX, localY, localMouseInCanvas, barsPerUnit * item.cs, rowsPerUnit * item.rs);
                 ctx.restore();
             });
         }
