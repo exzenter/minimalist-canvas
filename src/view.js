@@ -104,28 +104,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return Math.max(rowMinWidth, Math.min(rowMaxWidth, thickness));
         }
 
-        function drawWaveInstance(localWidth, localHeight, rotation, localMouseX, localMouseY, localMouseInCanvas) {
+        function drawWaveInstance(localWidth, localHeight, rotation, localMouseX, localMouseY, localMouseInCanvas, effectiveBars, effectiveRows) {
             ctx.save();
 
-            // Density calibration based on reference size
-            const referenceSize = 800;
-            const barsPerPixel = config.barsPerRow / referenceSize;
-            const rowsPerPixel = config.waveRows / referenceSize;
+            const roundedBars = Math.max(1, Math.round(effectiveBars));
+            const roundedRows = Math.max(1, Math.round(effectiveRows));
 
-            const effectiveBarsPerRow = Math.round(localWidth * barsPerPixel);
-            const effectiveWaveRows = Math.round(localHeight * rowsPerPixel);
-
-            const effectiveRowHeight = localHeight / effectiveWaveRows;
-            const barSpacing = localWidth / effectiveBarsPerRow;
+            const effectiveRowHeight = localHeight / roundedRows;
+            const barSpacing = localWidth / roundedBars;
 
             ctx.fillStyle = config.barColor;
             ctx.strokeStyle = config.barColor;
 
-            for (let row = 0; row < effectiveWaveRows; row++) {
+            for (let row = 0; row < roundedRows; row++) {
                 const rowCenterY = effectiveRowHeight * (row + 0.5);
-                const configRowIndex = Math.floor(row * config.waveRows / effectiveWaveRows);
+                const configRowIndex = Math.floor(row * config.waveRows / (effectiveRows || 1) * (localHeight / (localHeight || 1)));
+                // Note: configRowIndex mapping is tricky, but keeping it proportional to the config.waveRows
 
-                for (let bar = 0; bar < effectiveBarsPerRow; bar++) {
+                for (let bar = 0; bar < roundedBars; bar++) {
                     const x = barSpacing * (bar + 0.5);
                     const barWidth = getBarThickness(x, configRowIndex, time, localWidth, localMouseX, localMouseInCanvas);
 
@@ -146,8 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
                         }
                     } else {
-                        const topStart = Math.round(row * effectiveRowHeight);
-                        const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
+                        const topStart = row * effectiveRowHeight;
+                        const bottomEnd = (row + 1) * effectiveRowHeight;
                         ctx.fillRect(x - barWidth / 2, topStart, barWidth, bottomEnd - topStart);
                     }
                 }
@@ -158,13 +154,17 @@ document.addEventListener('DOMContentLoaded', () => {
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            const unitW = config.duplicateModeActive ? canvas.width / config.gridCols : canvas.width;
+            const unitH = config.duplicateModeActive ? canvas.height / config.gridRows : canvas.height;
+
+            const referenceSize = 800;
+            const barsPerUnit = (config.barsPerRow / referenceSize) * unitW;
+            const rowsPerUnit = (config.waveRows / referenceSize) * unitH;
+
             if (!config.duplicateModeActive) {
-                drawWaveInstance(canvas.width, canvas.height, 0, mouseX, mouseY, mouseInCanvas);
+                drawWaveInstance(canvas.width, canvas.height, 0, mouseX, mouseY, mouseInCanvas, barsPerUnit, rowsPerUnit);
                 return;
             }
-
-            const unitW = canvas.width / config.gridCols;
-            const unitH = canvas.height / config.gridRows;
 
             config.gridConfig.forEach(item => {
                 if (!item.isActive) return;
@@ -179,17 +179,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.rotate(item.rotation * Math.PI / 180);
                 ctx.translate(-cellW / 2, -cellH / 2);
 
-                // For global mouse interaction, we need the mouse position relative to this instance's coordinates
-                // Since we translated and rotated the context, we need to transform the mouse point inversely
                 const angle = -item.rotation * Math.PI / 180;
                 const cx = cellX + cellW / 2;
                 const cy = cellY + cellH / 2;
-
-                // Relative to center
                 const rx = mouseX - cx;
                 const ry = mouseY - cy;
-
-                // Rotated
                 const localX = rx * Math.cos(angle) - ry * Math.sin(angle) + cellW / 2;
                 const localY = rx * Math.sin(angle) + ry * Math.cos(angle) + cellH / 2;
 
@@ -197,12 +191,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     localX >= 0 && localX <= cellW &&
                     localY >= 0 && localY <= cellH;
 
-                // Clip to cell
                 ctx.beginPath();
                 ctx.rect(0, 0, cellW, cellH);
                 ctx.clip();
 
-                drawWaveInstance(cellW, cellH, item.rotation, localX, localY, localMouseInCanvas);
+                drawWaveInstance(cellW, cellH, item.rotation, localX, localY, localMouseInCanvas, barsPerUnit * item.cs, rowsPerUnit * item.rs);
                 ctx.restore();
             });
         }

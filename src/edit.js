@@ -259,26 +259,23 @@ export default function Edit({ attributes, setAttributes }) {
             return Math.max(rowMinWidth, Math.min(rowMaxWidth, thickness));
         }
 
-        function drawWaveInstance(localWidth, localHeight, localMouseX, localMouseY, localMouseInCanvas, conf) {
+        function drawWaveInstance(localWidth, localHeight, localMouseX, localMouseY, localMouseInCanvas, conf, effectiveBars, effectiveRows) {
             ctx.save();
-            const referenceSize = 800;
-            const barsPerPixel = conf.barsPerRow / referenceSize;
-            const rowsPerPixel = conf.waveRows / referenceSize;
 
-            const effectiveBarsPerRow = Math.round(localWidth * barsPerPixel);
-            const effectiveWaveRows = Math.round(localHeight * rowsPerPixel);
+            const roundedBars = Math.max(1, Math.round(effectiveBars));
+            const roundedRows = Math.max(1, Math.round(effectiveRows));
 
-            const effectiveRowHeight = localHeight / effectiveWaveRows;
-            const barSpacing = localWidth / effectiveBarsPerRow;
+            const effectiveRowHeight = localHeight / roundedRows;
+            const barSpacing = localWidth / roundedBars;
 
             ctx.fillStyle = conf.barColor;
             ctx.strokeStyle = conf.barColor;
 
-            for (let row = 0; row < effectiveWaveRows; row++) {
+            for (let row = 0; row < roundedRows; row++) {
                 const rowCenterY = effectiveRowHeight * (row + 0.5);
-                const configRowIndex = Math.floor(row * conf.waveRows / effectiveWaveRows);
+                const configRowIndex = Math.floor(row * conf.waveRows / (effectiveRows || 1) * (localHeight / (localHeight || 1)));
 
-                for (let bar = 0; bar < effectiveBarsPerRow; bar++) {
+                for (let bar = 0; bar < roundedBars; bar++) {
                     const x = barSpacing * (bar + 0.5);
                     const barWidth = getBarThickness(x, configRowIndex, time, localWidth, localMouseX, localMouseInCanvas, conf);
 
@@ -299,8 +296,8 @@ export default function Edit({ attributes, setAttributes }) {
                             ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
                         }
                     } else {
-                        const topStart = Math.round(row * effectiveRowHeight);
-                        const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
+                        const topStart = row * effectiveRowHeight;
+                        const bottomEnd = (row + 1) * effectiveRowHeight;
                         ctx.fillRect(x - barWidth / 2, topStart, barWidth, bottomEnd - topStart);
                     }
                 }
@@ -314,12 +311,16 @@ export default function Edit({ attributes, setAttributes }) {
 
             const { x: mX, y: mY, active: mActive } = mouseRef.current;
 
-            if (!conf.duplicateModeActive) {
-                drawWaveInstance(canvas.width, canvas.height, mX, mY, mActive, conf);
-            } else {
-                const unitW = canvas.width / conf.gridCols;
-                const unitH = canvas.height / conf.gridRows;
+            const unitW = conf.duplicateModeActive ? canvas.width / conf.gridCols : canvas.width;
+            const unitH = conf.duplicateModeActive ? canvas.height / conf.gridRows : canvas.height;
 
+            const referenceSize = 800;
+            const barsPerUnit = (conf.barsPerRow / referenceSize) * unitW;
+            const rowsPerUnit = (conf.waveRows / referenceSize) * unitH;
+
+            if (!conf.duplicateModeActive) {
+                drawWaveInstance(canvas.width, canvas.height, mX, mY, mActive, conf, barsPerUnit, rowsPerUnit);
+            } else {
                 conf.gridConfig.forEach(item => {
                     if (!item.isActive) return;
 
@@ -349,7 +350,7 @@ export default function Edit({ attributes, setAttributes }) {
                     ctx.rect(0, 0, cellW, cellH);
                     ctx.clip();
 
-                    drawWaveInstance(cellW, cellH, localX, localY, localMouseInCanvas, conf);
+                    drawWaveInstance(cellW, cellH, localX, localY, localMouseInCanvas, conf, barsPerUnit * item.cs, rowsPerUnit * item.rs);
                     ctx.restore();
                 });
             }
