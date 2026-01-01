@@ -151,6 +151,10 @@
         "mixBlendMode": {
             "type": "string",
             "default": "normal"
+        },
+        "animationDirection": {
+            "type": "number",
+            "default": 0
         }
     },
     "editorScript": "file:./index.js",

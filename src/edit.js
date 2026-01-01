@@ -24,7 +24,7 @@ export default function Edit({ attributes, setAttributes }) {
         rowPeakOffset, alternateDirection, combineOffsets,
         mouseAmplitude, amplitudeStrength,
         duplicateModeActive, gridRows, gridCols, gridConfig,
-        enableMixBlend, mixBlendMode
+        enableMixBlend, mixBlendMode, animationDirection
     } = attributes;
 
     const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -193,7 +193,7 @@ export default function Edit({ attributes, setAttributes }) {
         resizeObserver.observe(canvas.parentElement);
         initCanvas();
 
-        function getBarThickness(x, rowIndex, currentTime, localWidth, localMouseX, localMouseInCanvas, conf) {
+        function getBarThickness(x, y, rowIndex, currentTime, localWidth, localHeight, localMouseX, localMouseInCanvas, conf) {
             const rowMinWidth = conf.minBarWidth;
             const rowMaxWidth = conf.maxBarWidth;
             const rowSpeed = conf.thicknessSpeed;
@@ -205,7 +205,14 @@ export default function Edit({ attributes, setAttributes }) {
 
             if (!conf.animateThickness) return baseThickness;
 
-            const normalizedX = x / localWidth;
+            // Project coordinates onto animation direction vector
+            const angleRad = (conf.animationDirection || 0) * Math.PI / 180;
+            const dirX = Math.cos(angleRad);
+            const dirY = Math.sin(angleRad);
+
+            // Normalized projection
+            const projectedPos = (x * dirX + y * dirY) / (localWidth * Math.abs(dirX) + localHeight * Math.abs(dirY) || 1);
+
             const direction = rowAlternate && (rowIndex % 2 !== 0) ? -1 : 1;
 
             let rowSpecificOffset = rowOffset;
@@ -215,7 +222,7 @@ export default function Edit({ attributes, setAttributes }) {
                 rowSpecificOffset += rowIndex * conf.rowPeakOffset;
             }
 
-            const phase = normalizedX * Math.PI * conf.waveLength + currentTime * rowSpeed * direction + rowSpecificOffset;
+            const phase = projectedPos * Math.PI * conf.waveLength + currentTime * rowSpeed * direction + rowSpecificOffset;
 
             let waveValue;
             switch (conf.animationMode) {
@@ -278,7 +285,7 @@ export default function Edit({ attributes, setAttributes }) {
 
                 for (let bar = 0; bar < roundedBars; bar++) {
                     const x = barSpacing * (bar + 0.5);
-                    const barWidth = getBarThickness(x, configRowIndex, time, localWidth, localMouseX, localMouseInCanvas, conf);
+                    const barWidth = getBarThickness(x, rowCenterY, configRowIndex, time, localWidth, localHeight, localMouseX, localMouseInCanvas, conf);
 
                     if (conf.shapeMode === 'balls') {
                         ctx.beginPath();
@@ -539,6 +546,14 @@ export default function Edit({ attributes, setAttributes }) {
                                 min={0}
                                 max={6.28}
                                 step={0.01}
+                            />
+                            <RangeControl
+                                label={__('Animation Direction', 'minimalist')}
+                                hideHTML5Control={true}
+                                value={animationDirection}
+                                onChange={(val) => setAttributes({ animationDirection: val })}
+                                min={0}
+                                max={360}
                             />
                             <RangeControl
                                 label={__('Wave Length', 'minimalist')}

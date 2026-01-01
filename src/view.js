@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mouseInCanvas = false;
         });
 
-        function getBarThickness(x, rowIndex, currentTime, localWidth, localMouseX, localMouseInCanvas) {
+        function getBarThickness(x, y, rowIndex, currentTime, localWidth, localHeight, localMouseX, localMouseInCanvas) {
             const rowMinWidth = config.minBarWidth;
             const rowMaxWidth = config.maxBarWidth;
             const rowSpeed = config.thicknessSpeed;
@@ -49,7 +49,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!config.animateThickness) return baseThickness;
 
-            const normalizedX = x / localWidth;
+            // Project coordinates onto animation direction vector
+            const angleRad = (config.animationDirection || 0) * Math.PI / 180;
+            const dirX = Math.cos(angleRad);
+            const dirY = Math.sin(angleRad);
+
+            // Normalized projection
+            const projectedPos = (x * dirX + y * dirY) / (localWidth * Math.abs(dirX) + localHeight * Math.abs(dirY) || 1);
+
             const direction = rowAlternate && (rowIndex % 2 !== 0) ? -1 : 1;
 
             let rowSpecificOffset = rowOffset;
@@ -59,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 rowSpecificOffset += rowIndex * config.rowPeakOffset;
             }
 
-            const phase = normalizedX * Math.PI * config.waveLength + currentTime * rowSpeed * direction + rowSpecificOffset;
+            const phase = projectedPos * Math.PI * config.waveLength + currentTime * rowSpeed * direction + rowSpecificOffset;
 
             let waveValue;
             switch (config.animationMode) {
@@ -123,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 for (let bar = 0; bar < roundedBars; bar++) {
                     const x = barSpacing * (bar + 0.5);
-                    const barWidth = getBarThickness(x, configRowIndex, time, localWidth, localMouseX, localMouseInCanvas);
+                    const barWidth = getBarThickness(x, rowCenterY, configRowIndex, time, localWidth, localHeight, localMouseX, localMouseInCanvas);
 
                     if (config.shapeMode === 'balls') {
                         ctx.beginPath();
