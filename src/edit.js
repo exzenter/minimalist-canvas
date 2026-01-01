@@ -23,7 +23,8 @@ export default function Edit({ attributes, setAttributes }) {
         waveLength, thicknessCutoff, trailCutoff, trailCutoffStart,
         rowPeakOffset, alternateDirection, combineOffsets,
         mouseAmplitude, amplitudeStrength,
-        duplicateModeActive, gridRows, gridCols, gridConfig
+        duplicateModeActive, gridRows, gridCols, gridConfig,
+        enableMixBlend, mixBlendMode
     } = attributes;
 
     const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -460,14 +461,49 @@ export default function Edit({ attributes, setAttributes }) {
                             value: bgColor,
                             onChange: (val) => setAttributes({ bgColor: val }),
                             label: __('Background Color', 'minimalist'),
+                            // Background usually doesn't need alpha for the block itself, but can be enabled
                         },
                         {
                             value: barColor,
                             onChange: (val) => setAttributes({ barColor: val }),
                             label: __('Bar Color', 'minimalist'),
+                            __experimentalHasAlphaSupport: true,
                         },
                     ]}
                 />
+
+                <PanelBody title={__('Advanced Effects', 'minimalist')} initialOpen={false}>
+                    <ToggleControl
+                        label={__('Enable Mix Blend Mode', 'minimalist')}
+                        checked={enableMixBlend}
+                        onChange={(val) => setAttributes({ enableMixBlend: val })}
+                    />
+                    {enableMixBlend && (
+                        <SelectControl
+                            label={__('Blend Mode', 'minimalist')}
+                            value={mixBlendMode}
+                            options={[
+                                { label: 'Normal', value: 'normal' },
+                                { label: 'Multiply', value: 'multiply' },
+                                { label: 'Screen', value: 'screen' },
+                                { label: 'Overlay', value: 'overlay' },
+                                { label: 'Darken', value: 'darken' },
+                                { label: 'Lighten', value: 'lighten' },
+                                { label: 'Color Dodge', value: 'color-dodge' },
+                                { label: 'Color Burn', value: 'color-burn' },
+                                { label: 'Hard Light', value: 'hard-light' },
+                                { label: 'Soft Light', value: 'soft-light' },
+                                { label: 'Difference', value: 'difference' },
+                                { label: 'Exclusion', value: 'exclusion' },
+                                { label: 'Hue', value: 'hue' },
+                                { label: 'Saturation', value: 'saturation' },
+                                { label: 'Color', value: 'color' },
+                                { label: 'Luminosity', value: 'luminosity' },
+                            ]}
+                            onChange={(val) => setAttributes({ mixBlendMode: val })}
+                        />
+                    )}
+                </PanelBody>
 
                 <PanelBody title={__('Animation', 'minimalist')}>
                     <ToggleControl
@@ -639,7 +675,8 @@ export default function Edit({ attributes, setAttributes }) {
                     style={{
                         position: 'absolute',
                         top: 0, left: 0, width: '100%', height: '100%',
-                        zIndex: 0, pointerEvents: 'none'
+                        zIndex: 0, pointerEvents: 'none',
+                        mixBlendMode: enableMixBlend ? mixBlendMode : 'normal'
                     }}
                 />
                 {/* Visual grid guide in editor if duplicate mode is active */}

@@ -143,6 +143,14 @@
                     "isActive": true
                 }
             ]
+        },
+        "enableMixBlend": {
+            "type": "boolean",
+            "default": false
+        },
+        "mixBlendMode": {
+            "type": "string",
+            "default": "normal"
         }
     },
     "editorScript": "file:./index.js",
