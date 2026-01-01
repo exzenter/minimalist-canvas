@@ -297,9 +297,9 @@ export default function Edit({ attributes, setAttributes }) {
                             ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
                         }
                     } else {
-                        const topStart = row * effectiveRowHeight;
-                        const bottomEnd = (row + 1) * effectiveRowHeight;
-                        ctx.fillRect(x - barWidth / 2, topStart, barWidth, bottomEnd - topStart);
+                        const topStart = Math.round(row * effectiveRowHeight);
+                        const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
+                        ctx.fillRect(Math.round(x - barWidth / 2), topStart, Math.round(barWidth), bottomEnd - topStart);
                     }
                 }
             }
@@ -325,10 +325,10 @@ export default function Edit({ attributes, setAttributes }) {
                 conf.gridConfig.forEach(item => {
                     if (!item.isActive) return;
 
-                    const cellX = item.c * unitW;
-                    const cellY = item.r * unitH;
-                    const cellW = item.cs * unitW;
-                    const cellH = item.rs * unitH;
+                    const cellX = Math.round(item.c * unitW);
+                    const cellY = Math.round(item.r * unitH);
+                    const cellW = Math.round((item.c + item.cs) * unitW) - cellX;
+                    const cellH = Math.round((item.r + item.rs) * unitH) - cellY;
 
                     ctx.save();
                     ctx.translate(cellX + cellW / 2, cellY + cellH / 2);
