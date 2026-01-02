@@ -17,6 +17,93 @@ import {
 } from '@wordpress/components';
 import { useState, useEffect, useRef } from '@wordpress/element';
 
+const SETTINGS_CONFIG = [
+    {
+        title: __('Wave Structure', 'minimalist'),
+        settings: [
+            { key: 'snapToGrid', label: __('Snap Shapes to Grid', 'minimalist'), type: 'toggle', globalOnly: true, help: __('Ensures shapes align perfectly between different cells, especially when rotated.', 'minimalist') },
+            {
+                key: 'shapeMode', label: __('Shape Mode', 'minimalist'), type: 'select', options: [
+                    { label: 'Bars', value: 'bars' },
+                    { label: 'Balls (Circles)', value: 'balls' },
+                    { label: 'Squares', value: 'squares' },
+                ]
+            },
+            { key: 'strokeOnly', label: __('Stroke Only', 'minimalist'), type: 'toggle' },
+            { key: 'strokeWidth', label: __('Base Stroke Width', 'minimalist'), type: 'range', min: 0.1, max: 20, step: 0.1, condition: (attr) => attr.strokeOnly },
+            { key: 'waveRows', label: __('Wave Rows', 'minimalist'), type: 'range', min: 1, max: 100 },
+            { key: 'barsPerRow', label: __('Bars per Row', 'minimalist'), type: 'range', min: 10, max: 100 },
+            { key: 'minBarWidth', label: __('Min Bar Width', 'minimalist'), type: 'range', min: 0.1, max: 50, step: 0.1 },
+            { key: 'maxBarWidth', label: __('Max Bar Width', 'minimalist'), type: 'range', min: 0.1, max: 50, step: 0.1 },
+            { key: 'barCoverage', label: __('Bar Coverage', 'minimalist'), type: 'range', min: 0, max: 100 },
+        ]
+    },
+    {
+        title: __('Colors', 'minimalist'),
+        settings: [
+            { key: 'bgColor', label: __('Background Color', 'minimalist'), type: 'color', globalOnly: true },
+            { key: 'barColor', label: __('Bar Color', 'minimalist'), type: 'color' },
+        ]
+    },
+    {
+        title: __('Animation', 'minimalist'),
+        settings: [
+            { key: 'animateThickness', label: __('Animate Bar Thickness', 'minimalist'), type: 'toggle' },
+            {
+                key: 'animationMode', label: __('Animation Mode', 'minimalist'), type: 'select', condition: (attr) => attr.animateThickness, options: [
+                    { label: 'Loop', value: 'loop' },
+                    { label: 'Ping-Pong', value: 'pingpong' },
+                    { label: 'Reset', value: 'reset' },
+                ]
+            },
+            { key: 'thicknessSpeed', label: __('Speed', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0.01, max: 8, step: 0.01 },
+            { key: 'thicknessOffset', label: __('Offset', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 6.28, step: 0.01 },
+            { key: 'animationDirection', label: __('Animation Direction', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness && attr.shapeMode !== 'bars', min: 0, max: 360 },
+            { key: 'waveLength', label: __('Wave Length', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0.01, max: 20, step: 0.01 },
+            { key: 'waveSpacing', label: __('Wave Spacing', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 200 },
+            { key: 'thicknessCutoff', label: __('Cutoff', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 100 },
+            { key: 'trailCutoff', label: __('Trail Cutoff', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: -100, max: 100 },
+            { key: 'trailCutoffStart', label: __('Trail Start', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 100 },
+            { key: 'rowPeakOffset', label: __('Row Peak Offset', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 6.28, step: 0.01 },
+            { key: 'alternateDirection', label: __('Alternate Row Direction', 'minimalist'), type: 'toggle', condition: (attr) => attr.animateThickness },
+            { key: 'combineOffsets', label: __('Combine Offsets (auto cascade)', 'minimalist'), type: 'toggle', condition: (attr) => attr.animateThickness },
+        ]
+    },
+    {
+        title: __('Mouse Interaction', 'minimalist'),
+        settings: [
+            { key: 'mouseAmplitude', label: __('Mouse Changes Amplitude', 'minimalist'), type: 'toggle' },
+            { key: 'amplitudeStrength', label: __('Effect Strength', 'minimalist'), type: 'range', condition: (attr) => attr.mouseAmplitude, min: 0.01, max: 8, step: 0.01 },
+        ]
+    },
+    {
+        title: __('Advanced Effects', 'minimalist'),
+        settings: [
+            { key: 'enableMixBlend', label: __('Enable Mix Blend Mode', 'minimalist'), type: 'toggle' },
+            {
+                key: 'mixBlendMode', label: __('Blend Mode', 'minimalist'), type: 'select', condition: (attr) => attr.enableMixBlend, options: [
+                    { label: 'Normal', value: 'normal' },
+                    { label: 'Multiply', value: 'multiply' },
+                    { label: 'Screen', value: 'screen' },
+                    { label: 'Overlay', value: 'overlay' },
+                    { label: 'Darken', value: 'darken' },
+                    { label: 'Lighten', value: 'lighten' },
+                    { label: 'Color Dodge', value: 'color-dodge' },
+                    { label: 'Color Burn', value: 'color-burn' },
+                    { label: 'Hard Light', value: 'hard-light' },
+                    { label: 'Soft Light', value: 'soft-light' },
+                    { label: 'Difference', value: 'difference' },
+                    { label: 'Exclusion', value: 'exclusion' },
+                    { label: 'Hue', value: 'hue' },
+                    { label: 'Saturation', value: 'saturation' },
+                    { label: 'Color', value: 'color' },
+                    { label: 'Luminosity', value: 'luminosity' },
+                ]
+            },
+        ]
+    }
+];
+
 export default function Edit({ attributes, setAttributes }) {
     const {
         shapeMode, strokeOnly, strokeWidth, waveRows, barsPerRow,
@@ -215,60 +302,60 @@ export default function Edit({ attributes, setAttributes }) {
         const item = gridConfig[activeCellIndex];
         if (!item) return null;
 
-        const renderOverrideControl = (label, key, Control, props) => {
+        const renderGenericOverride = (setting) => {
+            const { key, label, type, condition } = setting;
+
+            // Check visibility condition if defined
+            if (condition && !condition({ ...attributes, ...item })) {
+                return null;
+            }
+
             const isOverridden = item[key] !== undefined;
             const value = isOverridden ? item[key] : attributes[key];
+            const onChange = (val) => setInstanceOverride(activeCellIndex, key, val);
+            const onReset = () => setInstanceOverride(activeCellIndex, key, undefined);
 
             return (
-                <div style={{ marginBottom: '15px', border: isOverridden ? '1px solid #787c82' : '1px transparent', padding: '5px', borderRadius: '4px', position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={key} style={{
+                    marginBottom: '15px',
+                    border: isOverridden ? '1px solid #007cba' : '1px transparent',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    position: 'relative',
+                    background: isOverridden ? 'rgba(0, 124, 186, 0.05)' : 'transparent'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div style={{ flex: 1 }}>
-                            <Control
-                                label={label}
-                                value={value}
-                                {...props}
-                                onChange={(val) => setInstanceOverride(activeCellIndex, key, val)}
-                            />
+                            {type === 'toggle' && <ToggleControl label={label} checked={value} onChange={onChange} help={setting.help} />}
+                            {type === 'range' && <RangeControl label={label} value={value} onChange={onChange} min={setting.min} max={setting.max} step={setting.step} />}
+                            {type === 'select' && <SelectControl label={label} value={value} options={setting.options} onChange={onChange} />}
+                            {type === 'color' && (
+                                <div style={{ marginBottom: '5px' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: '500', display: 'block', marginBottom: '8px' }}>{label}</span>
+                                    <ColorPicker
+                                        color={value}
+                                        onChange={(newColor) => {
+                                            if (!newColor) return;
+                                            const colorString = typeof newColor === 'string'
+                                                ? newColor
+                                                : (newColor.rgb ? `rgba(${newColor.rgb.r}, ${newColor.rgb.g}, ${newColor.rgb.b}, ${newColor.rgb.a})` : newColor.hex);
+                                            onChange(colorString);
+                                        }}
+                                        enableAlpha
+                                        __experimentalHasAlphaSupport
+                                    />
+                                </div>
+                            )}
                         </div>
                         {isOverridden && (
                             <Button
                                 icon="undo"
                                 isSmall
-                                onClick={() => setInstanceOverride(activeCellIndex, key, undefined)}
+                                onClick={onReset}
                                 label={__('Reset to Global', 'minimalist')}
                                 style={{ marginLeft: '10px' }}
                             />
                         )}
-                    </div>
-                </div>
-            );
-        };
-
-        const renderColorOverride = (label, key) => {
-            const isOverridden = item[key] !== undefined;
-            const value = isOverridden ? item[key] : attributes[key];
-
-            return (
-                <div style={{ marginBottom: '15px', border: isOverridden ? '1px solid #787c82' : '1px transparent', padding: '5px', borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '500' }}>{label}</span>
-                        {isOverridden && (
-                            <Button
-                                icon="undo"
-                                isSmall
-                                onClick={() => setInstanceOverride(activeCellIndex, key, undefined)}
-                                label={__('Reset to Global', 'minimalist')}
-                            />
-                        )}
-                    </div>
-                    {/* Proper alpha-aware color selector for modal */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <ColorPicker
-                            color={value}
-                            onChange={(val) => setInstanceOverride(activeCellIndex, key, val)}
-                            enableAlpha
-                            copyFormat="rgba"
-                        />
                     </div>
                 </div>
             );
@@ -281,58 +368,17 @@ export default function Edit({ attributes, setAttributes }) {
                     {__('Settings here apply ONLY to the selected instance. Blue borders indicate overrides.', 'minimalist')}
                 </p>
 
-                {/* Structure matches InspectorControls order as requested */}
+                {SETTINGS_CONFIG.map((section, sIdx) => {
+                    const overridableSettings = section.settings.filter(s => !s.globalOnly);
+                    if (overridableSettings.length === 0) return null;
 
-                {/* 1. Wave Structure */}
-                {/* NOTE: If adding/removing global settings in future, ensure these instance overrides are updated to match */}
-                <div style={{ borderBottom: '1px solid #eee', mb: '15px', pt: '10px' }}>
-                    <h4>{__('Wave Structure', 'minimalist')}</h4>
-                    {renderOverrideControl(__('Shape Mode', 'minimalist'), 'shapeMode', SelectControl, {
-                        options: [
-                            { label: 'Bars', value: 'bars' },
-                            { label: 'Balls (Circles)', value: 'balls' },
-                            { label: 'Squares', value: 'squares' },
-                        ]
-                    })}
-                    {renderOverrideControl(__('Stroke Only', 'minimalist'), 'strokeOnly', ToggleControl, { checked: item.strokeOnly !== undefined ? item.strokeOnly : attributes.strokeOnly })}
-                    {renderOverrideControl(__('Wave Rows', 'minimalist'), 'waveRows', RangeControl, { min: 1, max: 100 })}
-                    {renderOverrideControl(__('Bars per Row', 'minimalist'), 'barsPerRow', RangeControl, { min: 10, max: 100 })}
-                    {renderOverrideControl(__('Min Bar Width', 'minimalist'), 'minBarWidth', RangeControl, { min: 0.1, max: 50, step: 0.1 })}
-                    {renderOverrideControl(__('Max Bar Width', 'minimalist'), 'maxBarWidth', RangeControl, { min: 0.1, max: 50, step: 0.1 })}
-                </div>
-
-                {/* 2. Colors */}
-                <div style={{ borderBottom: '1px solid #eee', mb: '15px', pt: '10px' }}>
-                    <h4>{__('Colors', 'minimalist')}</h4>
-                    {renderColorOverride(__('Bar Color', 'minimalist'), 'barColor')}
-                </div>
-
-                {/* 3. Animation */}
-                <div style={{ borderBottom: '1px solid #eee', mb: '15px', pt: '10px' }}>
-                    <h4>{__('Animation', 'minimalist')}</h4>
-                    {renderOverrideControl(__('Animate Bar Thickness', 'minimalist'), 'animateThickness', ToggleControl, { checked: item.animateThickness !== undefined ? item.animateThickness : attributes.animateThickness })}
-                    {renderOverrideControl(__('Speed', 'minimalist'), 'thicknessSpeed', RangeControl, { min: 0.01, max: 8, step: 0.01 })}
-                    {(item.shapeMode || attributes.shapeMode) !== 'bars' && renderOverrideControl(__('Animation Direction', 'minimalist'), 'animationDirection', RangeControl, { min: 0, max: 360 })}
-                    {renderOverrideControl(__('Wave Length', 'minimalist'), 'waveLength', RangeControl, { min: 0.01, max: 20, step: 0.01 })}
-                    {renderOverrideControl(__('Cutoff', 'minimalist'), 'thicknessCutoff', RangeControl, { min: 0, max: 100 })}
-                    {renderOverrideControl(__('Trail Cutoff', 'minimalist'), 'trailCutoff', RangeControl, { min: -100, max: 100 })}
-                    {renderOverrideControl(__('Row Peak Offset', 'minimalist'), 'rowPeakOffset', RangeControl, { min: 0, max: 6.28, step: 0.01 })}
-                    {renderOverrideControl(__('Alternate Row Direction', 'minimalist'), 'alternateDirection', ToggleControl, { checked: item.alternateDirection !== undefined ? item.alternateDirection : attributes.alternateDirection })}
-                </div>
-
-                {/* 4. Advanced Effects */}
-                <div style={{ mb: '15px', pt: '10px' }}>
-                    <h4>{__('Advanced Effects', 'minimalist')}</h4>
-                    {renderOverrideControl(__('Enable Mix Blend Mode', 'minimalist'), 'enableMixBlend', ToggleControl, { checked: item.enableMixBlend !== undefined ? item.enableMixBlend : attributes.enableMixBlend })}
-                    {renderOverrideControl(__('Blend Mode', 'minimalist'), 'mixBlendMode', SelectControl, {
-                        options: [
-                            { label: 'Normal', value: 'normal' },
-                            { label: 'Multiply', value: 'multiply' },
-                            { label: 'Screen', value: 'screen' },
-                            { label: 'Overlay', value: 'overlay' },
-                        ]
-                    })}
-                </div>
+                    return (
+                        <div key={sIdx} style={{ borderBottom: '1px solid #eee', mb: '15px', pt: '10px' }}>
+                            <h4>{section.title}</h4>
+                            {overridableSettings.map(setting => renderGenericOverride(setting))}
+                        </div>
+                    );
+                })}
             </div>
         );
     };
@@ -412,6 +458,19 @@ export default function Edit({ attributes, setAttributes }) {
                     waveValue = Math.sin(phase);
             }
 
+            // Wave Spacing: create gaps between waves where shapes stay at min size
+            if (conf.waveSpacing > 0) {
+                const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
+                const spacingRatio = conf.waveSpacing / 100;
+                // If we're in the "gap" portion of the cycle, return min size
+                if (cyclePhase > (1 - spacingRatio)) {
+                    return rowMinWidth;
+                }
+                // Scale the waveValue to complete a full wave in the remaining portion
+                const adjustedPhase = (cyclePhase / (1 - spacingRatio)) * Math.PI * 2;
+                waveValue = Math.sin(adjustedPhase);
+            }
+
             if (conf.thicknessCutoff > 0) {
                 const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
                 if (cyclePhase > (1 - conf.thicknessCutoff / 100)) return rowMinWidth;
@@ -479,10 +538,12 @@ export default function Edit({ attributes, setAttributes }) {
                             ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
                         }
                     } else {
-                        const topStart = Math.round(row * effectiveRowHeight);
-                        const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
+                        const coverageValue = (conf.barCoverage / 100);
+                        const topStart = row * effectiveRowHeight + (effectiveRowHeight * (1 - coverageValue) / 2);
+                        const bottomEnd = topStart + (effectiveRowHeight * coverageValue);
+
                         // Removing Math.round from horizontal to restore smooth animation
-                        ctx.fillRect(x - barWidth / 2, topStart, barWidth + 1, bottomEnd - topStart + 1);
+                        ctx.fillRect(x - barWidth / 2, topStart, barWidth + 1, bottomEnd - topStart);
                     }
                 }
             }
@@ -590,240 +651,52 @@ export default function Edit({ attributes, setAttributes }) {
     return (
         <>
             <InspectorControls>
-                <PanelBody title={__('Wave Structure', 'minimalist')}>
-                    <ToggleControl
-                        label={__('Snap Shapes to Grid', 'minimalist')}
-                        help={__('Ensures shapes align perfectly between different cells, especially when rotated.', 'minimalist')}
-                        checked={snapToGrid}
-                        onChange={(val) => setAttributes({ snapToGrid: val })}
-                    />
-                    <SelectControl
-                        label={__('Shape Mode', 'minimalist')}
-                        value={shapeMode}
-                        options={[
-                            { label: 'Bars', value: 'bars' },
-                            { label: 'Balls (Circles)', value: 'balls' },
-                            { label: 'Squares', value: 'squares' },
-                        ]}
-                        onChange={(val) => setAttributes({ shapeMode: val })}
-                    />
-                    <ToggleControl
-                        label={__('Stroke Only', 'minimalist')}
-                        checked={strokeOnly}
-                        onChange={(val) => setAttributes({ strokeOnly: val })}
-                    />
-                    {strokeOnly && (
-                        <RangeControl
-                            label={__('Base Stroke Width', 'minimalist')}
-                            value={strokeWidth}
-                            onChange={(val) => setAttributes({ strokeWidth: val })}
-                            min={0.1}
-                            max={20}
-                            step={0.1}
-                        />
-                    )}
-                    <RangeControl
-                        label={__('Wave Rows', 'minimalist')}
-                        value={waveRows}
-                        onChange={(val) => setAttributes({ waveRows: val })}
-                        min={1}
-                        max={100}
-                    />
-                    <RangeControl
-                        label={__('Bars per Row', 'minimalist')}
-                        value={barsPerRow}
-                        onChange={(val) => setAttributes({ barsPerRow: val })}
-                        min={10}
-                        max={100}
-                    />
-                    <RangeControl
-                        label={__('Min Bar Width', 'minimalist')}
-                        value={minBarWidth}
-                        onChange={(val) => setAttributes({ minBarWidth: val })}
-                        min={0.1}
-                        max={50}
-                        step={0.1}
-                    />
-                    <RangeControl
-                        label={__('Max Bar Width', 'minimalist')}
-                        value={maxBarWidth}
-                        onChange={(val) => setAttributes({ maxBarWidth: val })}
-                        min={0.1}
-                        max={50}
-                        step={0.1}
-                    />
-                    <RangeControl
-                        label={__('Bar Coverage', 'minimalist')}
-                        value={barCoverage}
-                        onChange={(val) => setAttributes({ barCoverage: val })}
-                        min={0}
-                        max={100}
-                    />
-                </PanelBody>
+                {SETTINGS_CONFIG.map((section, sIdx) => {
+                    if (section.title === __('Colors', 'minimalist')) {
+                        return (
+                            <PanelBody key={sIdx} title={section.title} initialOpen={true}>
+                                {section.settings.map(setting => (
+                                    <div key={setting.key} style={{ marginBottom: '20px' }}>
+                                        <span style={{ fontSize: '13px', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
+                                            {setting.label}
+                                        </span>
+                                        <ColorPicker
+                                            color={attributes[setting.key]}
+                                            onChange={(newColor) => {
+                                                if (!newColor) return;
+                                                const colorString = typeof newColor === 'string'
+                                                    ? newColor
+                                                    : (newColor.rgb ? `rgba(${newColor.rgb.r}, ${newColor.rgb.g}, ${newColor.rgb.b}, ${newColor.rgb.a})` : newColor.hex);
+                                                setAttributes({ [setting.key]: colorString });
+                                            }}
+                                            enableAlpha
+                                        />
+                                    </div>
+                                ))}
+                            </PanelBody>
+                        );
+                    }
 
-                <PanelColorSettings
-                    title={__('Colors', 'minimalist')}
-                    colorSettings={[
-                        {
-                            value: bgColor,
-                            onChange: (val) => setAttributes({ bgColor: val }),
-                            label: __('Background Color', 'minimalist'),
-                            __experimentalHasAlphaSupport: true,
-                        },
-                        {
-                            value: barColor,
-                            onChange: (val) => setAttributes({ barColor: val }),
-                            label: __('Bar Color', 'minimalist'),
-                            __experimentalHasAlphaSupport: true,
-                        },
-                    ]}
-                />
+                    return (
+                        <PanelBody key={sIdx} title={section.title} initialOpen={sIdx === 0}>
+                            {section.settings.map(setting => {
+                                if (setting.condition && !setting.condition(attributes)) return null;
 
-                <PanelBody title={__('Advanced Effects', 'minimalist')} initialOpen={false}>
-                    <ToggleControl
-                        label={__('Enable Mix Blend Mode', 'minimalist')}
-                        checked={enableMixBlend}
-                        onChange={(val) => setAttributes({ enableMixBlend: val })}
-                    />
-                    {enableMixBlend && (
-                        <SelectControl
-                            label={__('Blend Mode', 'minimalist')}
-                            value={mixBlendMode}
-                            options={[
-                                { label: 'Normal', value: 'normal' },
-                                { label: 'Multiply', value: 'multiply' },
-                                { label: 'Screen', value: 'screen' },
-                                { label: 'Overlay', value: 'overlay' },
-                                { label: 'Darken', value: 'darken' },
-                                { label: 'Lighten', value: 'lighten' },
-                                { label: 'Color Dodge', value: 'color-dodge' },
-                                { label: 'Color Burn', value: 'color-burn' },
-                                { label: 'Hard Light', value: 'hard-light' },
-                                { label: 'Soft Light', value: 'soft-light' },
-                                { label: 'Difference', value: 'difference' },
-                                { label: 'Exclusion', value: 'exclusion' },
-                                { label: 'Hue', value: 'hue' },
-                                { label: 'Saturation', value: 'saturation' },
-                                { label: 'Color', value: 'color' },
-                                { label: 'Luminosity', value: 'luminosity' },
-                            ]}
-                            onChange={(val) => setAttributes({ mixBlendMode: val })}
-                        />
-                    )}
-                </PanelBody>
+                                const { key, label, type, help, options, min, max, step } = setting;
+                                const value = attributes[key];
+                                const onChange = (val) => setAttributes({ [key]: val });
 
-                <PanelBody title={__('Animation', 'minimalist')}>
-                    <ToggleControl
-                        label={__('Animate Bar Thickness', 'minimalist')}
-                        checked={animateThickness}
-                        onChange={(val) => setAttributes({ animateThickness: val })}
-                    />
-                    {animateThickness && (
-                        <>
-                            <SelectControl
-                                label={__('Animation Mode', 'minimalist')}
-                                value={animationMode}
-                                options={[
-                                    { label: 'Loop', value: 'loop' },
-                                    { label: 'Ping-Pong', value: 'pingpong' },
-                                    { label: 'Reset', value: 'reset' },
-                                ]}
-                                onChange={(val) => setAttributes({ animationMode: val })}
-                            />
-                            <RangeControl
-                                label={__('Speed', 'minimalist')}
-                                value={thicknessSpeed}
-                                onChange={(val) => setAttributes({ thicknessSpeed: val })}
-                                min={0.01}
-                                max={8}
-                                step={0.01}
-                            />
-                            <RangeControl
-                                label={__('Offset', 'minimalist')}
-                                value={thicknessOffset}
-                                onChange={(val) => setAttributes({ thicknessOffset: val })}
-                                min={0}
-                                max={6.28}
-                                step={0.01}
-                            />
-                            {shapeMode !== 'bars' && (
-                                <RangeControl
-                                    label={__('Animation Direction', 'minimalist')}
-                                    hideHTML5Control={true}
-                                    value={animationDirection}
-                                    onChange={(val) => setAttributes({ animationDirection: val })}
-                                    min={0}
-                                    max={360}
-                                />
-                            )}
-                            <RangeControl
-                                label={__('Wave Length', 'minimalist')}
-                                value={waveLength}
-                                onChange={(val) => setAttributes({ waveLength: val })}
-                                min={0.01}
-                                max={20}
-                                step={0.01}
-                            />
-                            <RangeControl
-                                label={__('Cutoff', 'minimalist')}
-                                value={thicknessCutoff}
-                                onChange={(val) => setAttributes({ thicknessCutoff: val })}
-                                min={0}
-                                max={100}
-                            />
-                            <RangeControl
-                                label={__('Trail Cutoff', 'minimalist')}
-                                value={trailCutoff}
-                                onChange={(val) => setAttributes({ trailCutoff: val })}
-                                min={-100}
-                                max={100}
-                            />
-                            <RangeControl
-                                label={__('Trail Start', 'minimalist')}
-                                value={trailCutoffStart}
-                                onChange={(val) => setAttributes({ trailCutoffStart: val })}
-                                min={0}
-                                max={100}
-                            />
-                            <RangeControl
-                                label={__('Row Peak Offset', 'minimalist')}
-                                value={rowPeakOffset}
-                                onChange={(val) => setAttributes({ rowPeakOffset: val })}
-                                min={0}
-                                max={6.28}
-                                step={0.01}
-                            />
-                            <ToggleControl
-                                label={__('Alternate Row Direction', 'minimalist')}
-                                checked={alternateDirection}
-                                onChange={(val) => setAttributes({ alternateDirection: val })}
-                            />
-                            <ToggleControl
-                                label={__('Combine Offsets (auto cascade)', 'minimalist')}
-                                checked={combineOffsets}
-                                onChange={(val) => setAttributes({ combineOffsets: val })}
-                            />
-                        </>
-                    )}
-                </PanelBody>
-
-                <PanelBody title={__('Mouse Interaction', 'minimalist')}>
-                    <ToggleControl
-                        label={__('Mouse Changes Amplitude', 'minimalist')}
-                        checked={mouseAmplitude}
-                        onChange={(val) => setAttributes({ mouseAmplitude: val })}
-                    />
-                    {mouseAmplitude && (
-                        <RangeControl
-                            label={__('Effect Strength', 'minimalist')}
-                            value={amplitudeStrength}
-                            onChange={(val) => setAttributes({ amplitudeStrength: val })}
-                            min={0.01}
-                            max={8}
-                            step={0.01}
-                        />
-                    )}
-                </PanelBody>
+                                return (
+                                    <div key={key}>
+                                        {type === 'toggle' && <ToggleControl label={label} checked={value} onChange={onChange} help={help} />}
+                                        {type === 'range' && <RangeControl label={label} value={value} onChange={onChange} min={min} max={max} step={step} />}
+                                        {type === 'select' && <SelectControl label={label} value={value} options={options} onChange={onChange} />}
+                                    </div>
+                                );
+                            })}
+                        </PanelBody>
+                    );
+                })}
 
                 <PanelBody title={__('Duplicate Mode', 'minimalist')} initialOpen={false}>
                     <ToggleControl

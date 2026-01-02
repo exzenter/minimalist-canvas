@@ -16,6 +16,45 @@ document.addEventListener('DOMContentLoaded', () => {
         let mouseX = 0;
         let mouseY = 0;
         let mouseInCanvas = false;
+        let isVisible = true;
+        let animationFrame = null;
+
+        // === OPTIMIZATION 4: Pre-calculate and cache trigonometric values ===
+        const cachedTrig = {
+            animationDirection: {
+                angleRad: 0,
+                dirX: 1,
+                dirY: 0
+            },
+            rotations: {} // Cache per rotation angle
+        };
+
+        function updateTrigCache() {
+            // Cache animation direction trig values
+            const angleRad = (config.animationDirection || 0) * Math.PI / 180;
+            cachedTrig.animationDirection.angleRad = angleRad;
+            cachedTrig.animationDirection.dirX = Math.cos(angleRad);
+            cachedTrig.animationDirection.dirY = Math.sin(angleRad);
+
+            // Cache rotation values for each grid cell
+            if (config.duplicateModeActive && config.gridConfig) {
+                config.gridConfig.forEach(item => {
+                    const rotation = item.rotation || 0;
+                    if (!cachedTrig.rotations[rotation]) {
+                        const rad = rotation * Math.PI / 180;
+                        const negRad = -rad;
+                        cachedTrig.rotations[rotation] = {
+                            rad: rad,
+                            cos: Math.cos(negRad),
+                            sin: Math.sin(negRad)
+                        };
+                    }
+                });
+            }
+        }
+
+        // Initialize trig cache
+        updateTrigCache();
 
         function initCanvas() {
             const rect = block.getBoundingClientRect();
@@ -53,10 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (conf.shapeMode === 'bars') {
                 projectedPos = x / localWidth;
             } else {
-                // Project coordinates onto animation direction vector
-                const angleRad = (conf.animationDirection || 0) * Math.PI / 180;
-                const dirX = Math.cos(angleRad);
-                const dirY = Math.sin(angleRad);
+                // === OPTIMIZATION 4: Use cached trig values ===
+                const dirX = cachedTrig.animationDirection.dirX;
+                const dirY = cachedTrig.animationDirection.dirY;
 
                 // Normalized projection
                 projectedPos = (x * dirX + y * dirY) / (localWidth * Math.abs(dirX) + localHeight * Math.abs(dirY) || 1);
@@ -84,6 +122,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                 default:
                     waveValue = Math.sin(phase);
+            }
+
+            // Wave Spacing: create gaps between waves where shapes stay at min size
+            if (conf.waveSpacing > 0) {
+                const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
+                const spacingRatio = conf.waveSpacing / 100;
+                // If we're in the "gap" portion of the cycle, return min size
+                if (cyclePhase > (1 - spacingRatio)) {
+                    return rowMinWidth;
+                }
+                // Scale the waveValue to complete a full wave in the remaining portion
+                const adjustedPhase = (cyclePhase / (1 - spacingRatio)) * Math.PI * 2;
+                waveValue = Math.sin(adjustedPhase);
             }
 
             if (conf.thicknessCutoff > 0) {
@@ -153,10 +204,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
                         }
                     } else {
-                        const topStart = Math.round(row * effectiveRowHeight);
-                        const bottomEnd = Math.round((row + 1) * effectiveRowHeight);
+                        const coverageValue = (conf.barCoverage / 100);
+                        const topStart = row * effectiveRowHeight + (effectiveRowHeight * (1 - coverageValue) / 2);
+                        const bottomEnd = topStart + (effectiveRowHeight * coverageValue);
+
                         // Removing Math.round from horizontal to restore smooth animation
-                        ctx.fillRect(x - barWidth / 2, topStart, barWidth + 1, bottomEnd - topStart + 1);
+                        ctx.fillRect(x - barWidth / 2, topStart, barWidth + 1, bottomEnd - topStart);
                     }
                 }
             }
@@ -197,13 +250,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.rotate(item.rotation * Math.PI / 180);
                 ctx.translate(-cellW / 2, -cellH / 2);
 
-                const angle = -item.rotation * Math.PI / 180;
+                // === OPTIMIZATION 4: Use cached rotation trig values ===
+                const rotation = item.rotation || 0;
+                const rotCache = cachedTrig.rotations[rotation] || { cos: 1, sin: 0 };
                 const cx = cellX + cellW / 2;
                 const cy = cellY + cellH / 2;
                 const rx = mouseX - cx;
                 const ry = mouseY - cy;
-                const localX = rx * Math.cos(angle) - ry * Math.sin(angle) + cellW / 2;
-                const localY = rx * Math.sin(angle) + ry * Math.cos(angle) + cellH / 2;
+                const localX = rx * rotCache.cos - ry * rotCache.sin + cellW / 2;
+                const localY = rx * rotCache.sin + ry * rotCache.cos + cellH / 2;
 
                 const localMouseInCanvas = mouseInCanvas &&
                     localX >= 0 && localX <= cellW &&
@@ -223,11 +278,58 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function animate() {
+            // === OPTIMIZATION 1: Only animate if visible ===
+            if (!isVisible) {
+                animationFrame = null;
+                return;
+            }
+
             time += 0.016;
             draw();
-            requestAnimationFrame(animate);
+            animationFrame = requestAnimationFrame(animate);
         }
 
-        animate();
+        function startAnimation() {
+            if (animationFrame === null) {
+                animate();
+            }
+        }
+
+        function stopAnimation() {
+            if (animationFrame !== null) {
+                cancelAnimationFrame(animationFrame);
+                animationFrame = null;
+            }
+        }
+
+        // === OPTIMIZATION 1: IntersectionObserver to pause when off-screen ===
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                isVisible = entry.isIntersecting;
+                if (isVisible) {
+                    // Resume animation when visible
+                    if (config.animateThickness) {
+                        startAnimation();
+                    }
+                } else {
+                    // Pause animation when not visible
+                    stopAnimation();
+                }
+            });
+        }, {
+            threshold: 0,
+            rootMargin: '50px' // Start slightly before visible
+        });
+
+        observer.observe(block);
+
+        // === OPTIMIZATION 1: If no animation, draw once and stop ===
+        if (config.animateThickness) {
+            animate();
+        } else {
+            // Static mode - just draw once
+            draw();
+        }
     });
 });
+

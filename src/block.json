@@ -61,11 +61,11 @@
         },
         "bgColor": {
             "type": "string",
-            "default": "#e8e0d5"
+            "default": "rgba(232, 224, 213, 1)"
         },
         "barColor": {
             "type": "string",
-            "default": "#1a1a1a"
+            "default": "rgba(26, 26, 26, 1)"
         },
         "animateThickness": {
             "type": "boolean",
@@ -86,6 +86,10 @@
         "waveLength": {
             "type": "number",
             "default": 4
+        },
+        "waveSpacing": {
+            "type": "number",
+            "default": 0
         },
         "thicknessCutoff": {
             "type": "number",
