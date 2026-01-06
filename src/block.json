@@ -59,6 +59,18 @@
             "type": "number",
             "default": 100
         },
+        "logScale": {
+            "type": "boolean",
+            "default": false
+        },
+        "logStrength": {
+            "type": "number",
+            "default": 2
+        },
+        "logReverse": {
+            "type": "boolean",
+            "default": false
+        },
         "bgColor": {
             "type": "string",
             "default": "rgba(232, 224, 213, 1)"
@@ -86,10 +98,6 @@
         "waveLength": {
             "type": "number",
             "default": 4
-        },
-        "waveSpacing": {
-            "type": "number",
-            "default": 0
         },
         "thicknessCutoff": {
             "type": "number",

@@ -36,6 +36,9 @@ const SETTINGS_CONFIG = [
             { key: 'minBarWidth', label: __('Min Bar Width', 'minimalist'), type: 'range', min: 0.1, max: 50, step: 0.1 },
             { key: 'maxBarWidth', label: __('Max Bar Width', 'minimalist'), type: 'range', min: 0.1, max: 50, step: 0.1 },
             { key: 'barCoverage', label: __('Bar Coverage', 'minimalist'), type: 'range', min: 0, max: 100 },
+            { key: 'logScale', label: __('Logarithmic Scale', 'minimalist'), type: 'toggle', help: __('Use logarithmic interpolation between min and max bar width.', 'minimalist') },
+            { key: 'logStrength', label: __('Log Strength', 'minimalist'), type: 'range', min: 1, max: 10, step: 0.1, condition: (attr) => attr.logScale },
+            { key: 'logReverse', label: __('Reverse Log', 'minimalist'), type: 'toggle', condition: (attr) => attr.logScale },
         ]
     },
     {
@@ -60,7 +63,6 @@ const SETTINGS_CONFIG = [
             { key: 'thicknessOffset', label: __('Offset', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 6.28, step: 0.01 },
             { key: 'animationDirection', label: __('Animation Direction', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness && attr.shapeMode !== 'bars', min: 0, max: 360 },
             { key: 'waveLength', label: __('Wave Length', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0.01, max: 20, step: 0.01 },
-            { key: 'waveSpacing', label: __('Wave Spacing', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 200 },
             { key: 'thicknessCutoff', label: __('Cutoff', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 100 },
             { key: 'trailCutoff', label: __('Trail Cutoff', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: -100, max: 100 },
             { key: 'trailCutoffStart', label: __('Trail Start', 'minimalist'), type: 'range', condition: (attr) => attr.animateThickness, min: 0, max: 100 },
@@ -458,19 +460,6 @@ export default function Edit({ attributes, setAttributes }) {
                     waveValue = Math.sin(phase);
             }
 
-            // Wave Spacing: create gaps between waves where shapes stay at min size
-            if (conf.waveSpacing > 0) {
-                const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
-                const spacingRatio = conf.waveSpacing / 100;
-                // If we're in the "gap" portion of the cycle, return min size
-                if (cyclePhase > (1 - spacingRatio)) {
-                    return rowMinWidth;
-                }
-                // Scale the waveValue to complete a full wave in the remaining portion
-                const adjustedPhase = (cyclePhase / (1 - spacingRatio)) * Math.PI * 2;
-                waveValue = Math.sin(adjustedPhase);
-            }
-
             if (conf.thicknessCutoff > 0) {
                 const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
                 if (cyclePhase > (1 - conf.thicknessCutoff / 100)) return rowMinWidth;
@@ -488,7 +477,23 @@ export default function Edit({ attributes, setAttributes }) {
                 }
             }
 
-            let thickness = baseThickness + waveValue * thicknessRange;
+            // Convert waveValue from [-1, 1] to [0, 1] for scaling
+            let normalizedWave = (waveValue + 1) / 2;
+
+            // Apply logarithmic scaling if enabled
+            if (conf.logScale) {
+                const strength = conf.logStrength || 2;
+                if (conf.logReverse) {
+                    // Reverse: start slow, accelerate at end
+                    normalizedWave = Math.pow(normalizedWave, strength);
+                } else {
+                    // Normal: start fast, slow down at end
+                    normalizedWave = 1 - Math.pow(1 - normalizedWave, strength);
+                }
+            }
+
+            // Map back to thickness range
+            let thickness = rowMinWidth + normalizedWave * (rowMaxWidth - rowMinWidth);
 
             if (conf.mouseAmplitude && localMouseInCanvas) {
                 const dx = x - localMouseX;

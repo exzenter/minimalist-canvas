@@ -124,19 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     waveValue = Math.sin(phase);
             }
 
-            // Wave Spacing: create gaps between waves where shapes stay at min size
-            if (conf.waveSpacing > 0) {
-                const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
-                const spacingRatio = conf.waveSpacing / 100;
-                // If we're in the "gap" portion of the cycle, return min size
-                if (cyclePhase > (1 - spacingRatio)) {
-                    return rowMinWidth;
-                }
-                // Scale the waveValue to complete a full wave in the remaining portion
-                const adjustedPhase = (cyclePhase / (1 - spacingRatio)) * Math.PI * 2;
-                waveValue = Math.sin(adjustedPhase);
-            }
-
             if (conf.thicknessCutoff > 0) {
                 const cyclePhase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
                 if (cyclePhase > (1 - conf.thicknessCutoff / 100)) return rowMinWidth;
@@ -154,7 +141,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            let thickness = baseThickness + waveValue * thicknessRange;
+            // Convert waveValue from [-1, 1] to [0, 1] for scaling
+            let normalizedWave = (waveValue + 1) / 2;
+
+            // Apply logarithmic scaling if enabled
+            if (conf.logScale) {
+                const strength = conf.logStrength || 2;
+                if (conf.logReverse) {
+                    // Reverse: start slow, accelerate at end
+                    normalizedWave = Math.pow(normalizedWave, strength);
+                } else {
+                    // Normal: start fast, slow down at end
+                    normalizedWave = 1 - Math.pow(1 - normalizedWave, strength);
+                }
+            }
+
+            // Map back to thickness range
+            let thickness = rowMinWidth + normalizedWave * (rowMaxWidth - rowMinWidth);
 
             if (conf.mouseAmplitude && localMouseInCanvas) {
                 const dx = x - localMouseX;
