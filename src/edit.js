@@ -29,6 +29,21 @@ const SETTINGS_CONFIG = [
                     { label: 'Bars', value: 'bars' },
                     { label: 'Balls (Circles)', value: 'balls' },
                     { label: 'Squares', value: 'squares' },
+                    { label: 'X', value: 'x' },
+                    { label: 'Plus (+)', value: 'plus' },
+                    { label: 'Triangle Up', value: 'tri-up' },
+                    { label: 'Triangle Down', value: 'tri-down' },
+                    { label: 'Triangle Left', value: 'tri-left' },
+                    { label: 'Triangle Right', value: 'tri-right' },
+                    { label: 'Diamond', value: 'diamond' },
+                    { label: 'Hexagon', value: 'hexagon' },
+                    { label: 'Star', value: 'star' },
+                    { label: 'Pill', value: 'pill' },
+                    { label: 'Chevron Up', value: 'chevron-up' },
+                    { label: 'Chevron Down', value: 'chevron-down' },
+                    { label: 'Chevron Left', value: 'chevron-left' },
+                    { label: 'Chevron Right', value: 'chevron-right' },
+                    { label: 'Octagon', value: 'octagon' },
                 ]
             },
             { key: 'strokeOnly', label: __('Stroke Only', 'minimalist'), type: 'toggle' },
@@ -545,12 +560,161 @@ export default function Edit({ attributes, setAttributes }) {
                         } else {
                             ctx.fillRect(x - barWidth / 2, rowCenterY - barWidth / 2, barWidth, barWidth);
                         }
-                    } else {
+                    } else if (conf.shapeMode === 'x') {
+                        const half = barWidth / 2;
+                        ctx.beginPath();
+                        ctx.moveTo(x - half, rowCenterY - half);
+                        ctx.lineTo(x + half, rowCenterY + half);
+                        ctx.moveTo(x + half, rowCenterY - half);
+                        ctx.lineTo(x - half, rowCenterY + half);
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                        } else {
+                            ctx.lineWidth = barWidth * 0.2;
+                        }
+                        ctx.stroke();
+                    } else if (conf.shapeMode === 'plus') {
+                        const half = barWidth / 2;
+                        ctx.beginPath();
+                        ctx.moveTo(x, rowCenterY - half);
+                        ctx.lineTo(x, rowCenterY + half);
+                        ctx.moveTo(x - half, rowCenterY);
+                        ctx.lineTo(x + half, rowCenterY);
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                        } else {
+                            ctx.lineWidth = barWidth * 0.2;
+                        }
+                        ctx.stroke();
+                    } else if (conf.shapeMode.startsWith('tri-')) {
+                        const half = barWidth / 2;
+                        ctx.beginPath();
+                        if (conf.shapeMode === 'tri-up') {
+                            ctx.moveTo(x, rowCenterY - half);
+                            ctx.lineTo(x + half, rowCenterY + half);
+                            ctx.lineTo(x - half, rowCenterY + half);
+                        } else if (conf.shapeMode === 'tri-down') {
+                            ctx.moveTo(x, rowCenterY + half);
+                            ctx.lineTo(x + half, rowCenterY - half);
+                            ctx.lineTo(x - half, rowCenterY - half);
+                        } else if (conf.shapeMode === 'tri-left') {
+                            ctx.moveTo(x - half, rowCenterY);
+                            ctx.lineTo(x + half, rowCenterY - half);
+                            ctx.lineTo(x + half, rowCenterY + half);
+                        } else if (conf.shapeMode === 'tri-right') {
+                            ctx.moveTo(x + half, rowCenterY);
+                            ctx.lineTo(x - half, rowCenterY - half);
+                            ctx.lineTo(x - half, rowCenterY + half);
+                        }
+                        ctx.closePath();
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.stroke();
+                        } else {
+                            ctx.fill();
+                        }
+                    } else if (conf.shapeMode === 'diamond') {
+                        const half = barWidth / 2;
+                        ctx.beginPath();
+                        ctx.moveTo(x, rowCenterY - half);
+                        ctx.lineTo(x + half, rowCenterY);
+                        ctx.lineTo(x, rowCenterY + half);
+                        ctx.lineTo(x - half, rowCenterY);
+                        ctx.closePath();
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.stroke();
+                        } else {
+                            ctx.fill();
+                        }
+                    } else if (conf.shapeMode === 'hexagon') {
+                        const r = barWidth / 2;
+                        ctx.beginPath();
+                        for (let i = 0; i < 6; i++) {
+                            const angle = (i * Math.PI) / 3;
+                            ctx.lineTo(x + r * Math.cos(angle), rowCenterY + r * Math.sin(angle));
+                        }
+                        ctx.closePath();
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.stroke();
+                        } else {
+                            ctx.fill();
+                        }
+                    } else if (conf.shapeMode === 'star') {
+                        const outerR = barWidth / 2;
+                        const innerR = outerR * 0.4;
+                        ctx.beginPath();
+                        for (let i = 0; i < 10; i++) {
+                            const angle = (i * Math.PI) / 5 - Math.PI / 2;
+                            const r = i % 2 === 0 ? outerR : innerR;
+                            ctx.lineTo(x + r * Math.cos(angle), rowCenterY + r * Math.sin(angle));
+                        }
+                        ctx.closePath();
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.stroke();
+                        } else {
+                            ctx.fill();
+                        }
+                    } else if (conf.shapeMode === 'pill') {
+                        const w = barWidth * 0.6;
+                        const h = barWidth;
+                        const r = w / 2;
+                        ctx.beginPath();
+                        if (ctx.roundRect) {
+                            ctx.roundRect(x - w / 2, rowCenterY - h / 2, w, h, r);
+                        } else {
+                            ctx.rect(x - w / 2, rowCenterY - h / 2, w, h);
+                        }
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.stroke();
+                        } else {
+                            ctx.fill();
+                        }
+                    } else if (conf.shapeMode.startsWith('chevron-')) {
+                        const half = barWidth / 2;
+                        ctx.beginPath();
+                        if (conf.shapeMode === 'chevron-up') {
+                            ctx.moveTo(x - half, rowCenterY + half);
+                            ctx.lineTo(x, rowCenterY);
+                            ctx.lineTo(x + half, rowCenterY + half);
+                        } else if (conf.shapeMode === 'chevron-down') {
+                            ctx.moveTo(x - half, rowCenterY - half);
+                            ctx.lineTo(x, rowCenterY);
+                            ctx.lineTo(x + half, rowCenterY - half);
+                        } else if (conf.shapeMode === 'chevron-left') {
+                            ctx.moveTo(x + half, rowCenterY - half);
+                            ctx.lineTo(x, rowCenterY);
+                            ctx.lineTo(x + half, rowCenterY + half);
+                        } else if (conf.shapeMode === 'chevron-right') {
+                            ctx.moveTo(x - half, rowCenterY - half);
+                            ctx.lineTo(x, rowCenterY);
+                            ctx.lineTo(x - half, rowCenterY + half);
+                        }
+                        ctx.lineWidth = conf.strokeOnly ? (barWidth / conf.maxBarWidth) * conf.strokeWidth : barWidth * 0.25;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.stroke();
+                    } else if (conf.shapeMode === 'octagon') {
+                        const r = barWidth / 2;
+                        ctx.beginPath();
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (i * Math.PI) / 4 + Math.PI / 8;
+                            ctx.lineTo(x + r * Math.cos(angle), rowCenterY + r * Math.sin(angle));
+                        }
+                        ctx.closePath();
+                        if (conf.strokeOnly) {
+                            ctx.lineWidth = (barWidth / conf.maxBarWidth) * conf.strokeWidth;
+                            ctx.stroke();
+                        } else {
+                            ctx.fill();
+                        }
+                    } else if (conf.shapeMode === 'bars') {
                         const coverageValue = (conf.barCoverage / 100);
                         const topStart = row * effectiveRowHeight + (effectiveRowHeight * (1 - coverageValue) / 2);
                         const bottomEnd = topStart + (effectiveRowHeight * coverageValue);
-
-                        // Removing Math.round from horizontal to restore smooth animation
                         ctx.fillRect(x - barWidth / 2, topStart, barWidth + 1, bottomEnd - topStart);
                     }
                 }
