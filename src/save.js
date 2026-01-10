@@ -1,11 +1,14 @@
 import { useBlockProps, InnerBlocks } from '@wordpress/block-editor';
 
 export default function save({ attributes }) {
-    const { bgColor } = attributes;
+    const { bgColor, aspectRatio } = attributes;
 
     const blockProps = useBlockProps.save({
         className: 'wp-block-minimalist-canvas',
-        style: { backgroundColor: bgColor },
+        style: {
+            backgroundColor: bgColor,
+            aspectRatio: aspectRatio || undefined
+        },
         'data-config': JSON.stringify(attributes)
     });
 

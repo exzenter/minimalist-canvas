@@ -175,6 +175,10 @@
         "snapToGrid": {
             "type": "boolean",
             "default": false
+        },
+        "aspectRatio": {
+            "type": "string",
+            "default": ""
         }
     },
     "editorScript": "file:./index.js",

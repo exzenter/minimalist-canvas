@@ -10,6 +10,7 @@ import {
     RangeControl,
     ToggleControl,
     SelectControl,
+    TextControl,
     Button,
     Popover,
     Modal,
@@ -21,6 +22,7 @@ const SETTINGS_CONFIG = [
     {
         title: __('Wave Structure', 'minimalist'),
         settings: [
+            { key: 'aspectRatio', label: __('Aspect Ratio', 'minimalist'), type: 'text', globalOnly: true, help: __('Set custom aspect ratio (e.g., "16:9", "4:3", "1:1"). Leave empty for default.', 'minimalist'), placeholder: __('e.g., 16:9', 'minimalist') },
             { key: 'snapToGrid', label: __('Snap Shapes to Grid', 'minimalist'), type: 'toggle', globalOnly: true, help: __('Ensures shapes align perfectly between different cells, especially when rotated.', 'minimalist') },
             {
                 key: 'shapeMode', label: __('Shape Mode', 'minimalist'), type: 'select', options: [
@@ -116,7 +118,7 @@ export default function Edit({ attributes, setAttributes }) {
         mouseAmplitude, amplitudeStrength,
         duplicateModeActive, gridRows, gridCols, gridConfig,
         enableMixBlend, mixBlendMode, animationDirection,
-        snapToGrid
+        snapToGrid, aspectRatio
     } = attributes;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -331,6 +333,7 @@ export default function Edit({ attributes, setAttributes }) {
                             {type === 'toggle' && <ToggleControl label={label} checked={value} onChange={onChange} help={setting.help} />}
                             {type === 'range' && <RangeControl label={label} value={value} onChange={onChange} min={setting.min} max={setting.max} step={setting.step} />}
                             {type === 'select' && <SelectControl label={label} value={value} options={setting.options} onChange={onChange} />}
+                            {type === 'text' && <TextControl label={label} value={value} onChange={onChange} help={setting.help} placeholder={setting.placeholder} />}
                             {type === 'color' && (
                                 <div style={{ marginBottom: '5px' }}>
                                     <span style={{ fontSize: '13px', fontWeight: '500', display: 'block', marginBottom: '8px' }}>{label}</span>
@@ -639,7 +642,12 @@ export default function Edit({ attributes, setAttributes }) {
     }, []);
 
     const blockProps = useBlockProps({
-        style: { backgroundColor: bgColor, position: 'relative', overflow: 'hidden' },
+        style: {
+            backgroundColor: bgColor,
+            position: 'relative',
+            overflow: 'hidden',
+            aspectRatio: aspectRatio || undefined
+        },
         onMouseMove: (e) => {
             const rect = canvasRef.current.getBoundingClientRect();
             mouseRef.current = {
@@ -696,6 +704,7 @@ export default function Edit({ attributes, setAttributes }) {
                                         {type === 'toggle' && <ToggleControl label={label} checked={value} onChange={onChange} help={help} />}
                                         {type === 'range' && <RangeControl label={label} value={value} onChange={onChange} min={min} max={max} step={step} />}
                                         {type === 'select' && <SelectControl label={label} value={value} options={options} onChange={onChange} />}
+                                        {type === 'text' && <TextControl label={label} value={value} onChange={onChange} help={help} placeholder={setting.placeholder} />}
                                     </div>
                                 );
                             })}
