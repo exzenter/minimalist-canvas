@@ -397,10 +397,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cellW = Math.round((item.c + item.cs) * unitW) - cellX;
                 const cellH = Math.round((item.r + item.rs) * unitH) - cellY;
 
+                // For 90° or 270° rotations, swap dimensions so aspect ratio is preserved
+                const isSwapped = (item.rotation === 90 || item.rotation === 270);
+                const drawW = isSwapped ? cellH : cellW;
+                const drawH = isSwapped ? cellW : cellH;
+
                 ctx.save();
                 ctx.translate(cellX + cellW / 2, cellY + cellH / 2);
                 ctx.rotate(item.rotation * Math.PI / 180);
-                ctx.translate(-cellW / 2, -cellH / 2);
+                ctx.translate(-drawW / 2, -drawH / 2);
 
                 // === OPTIMIZATION 4: Use cached rotation trig values ===
                 const rotation = item.rotation || 0;
@@ -409,21 +414,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cy = cellY + cellH / 2;
                 const rx = mouseX - cx;
                 const ry = mouseY - cy;
-                const localX = rx * rotCache.cos - ry * rotCache.sin + cellW / 2;
-                const localY = rx * rotCache.sin + ry * rotCache.cos + cellH / 2;
+                const localX = rx * rotCache.cos - ry * rotCache.sin + drawW / 2;
+                const localY = rx * rotCache.sin + ry * rotCache.cos + drawH / 2;
 
                 const localMouseInCanvas = mouseInCanvas &&
-                    localX >= 0 && localX <= cellW &&
-                    localY >= 0 && localY <= cellH;
+                    localX >= 0 && localX <= drawW &&
+                    localY >= 0 && localY <= drawH;
 
                 // Resolve instance configuration by merging global attributes with local overrides
                 // NOTE: If adding/removing global settings in future, ensure these instance overrides are updated to match
                 const instanceConfig = { ...config, ...item };
-
-                // For 90° or 270° rotations, swap dimensions so aspect ratio is preserved
-                const isSwapped = (item.rotation === 90 || item.rotation === 270);
-                const drawW = isSwapped ? cellH : cellW;
-                const drawH = isSwapped ? cellW : cellH;
 
                 ctx.beginPath();
                 ctx.rect(0, 0, drawW + 1, drawH + 1);

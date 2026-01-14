@@ -752,27 +752,27 @@ export default function Edit({ attributes, setAttributes }) {
                     const cellW = Math.round((item.c + item.cs) * unitW) - cellX;
                     const cellH = Math.round((item.r + item.rs) * unitH) - cellY;
 
+                    // For 90° or 270° rotations, swap dimensions so aspect ratio is preserved
+                    const isSwapped = (item.rotation === 90 || item.rotation === 270);
+                    const drawW = isSwapped ? cellH : cellW;
+                    const drawH = isSwapped ? cellW : cellH;
+
                     ctx.save();
                     ctx.translate(cellX + cellW / 2, cellY + cellH / 2);
                     ctx.rotate(item.rotation * Math.PI / 180);
-                    ctx.translate(-cellW / 2, -cellH / 2);
+                    ctx.translate(-drawW / 2, -drawH / 2);
 
                     const angle = -item.rotation * Math.PI / 180;
                     const cx = cellX + cellW / 2;
                     const cy = cellY + cellH / 2;
                     const rx = mX - cx;
                     const ry = mY - cy;
-                    const localX = rx * Math.cos(angle) - ry * Math.sin(angle) + cellW / 2;
-                    const localY = rx * Math.sin(angle) + ry * Math.cos(angle) + cellH / 2;
+                    const localX = rx * Math.cos(angle) - ry * Math.sin(angle) + drawW / 2;
+                    const localY = rx * Math.sin(angle) + ry * Math.cos(angle) + drawH / 2;
 
                     const localMouseInCanvas = mActive &&
-                        localX >= 0 && localX <= cellW &&
-                        localY >= 0 && localY <= cellH;
-
-                    // For 90° or 270° rotations, swap dimensions so aspect ratio is preserved
-                    const isSwapped = (item.rotation === 90 || item.rotation === 270);
-                    const drawW = isSwapped ? cellH : cellW;
-                    const drawH = isSwapped ? cellW : cellH;
+                        localX >= 0 && localX <= drawW &&
+                        localY >= 0 && localY <= drawH;
 
                     ctx.beginPath();
                     ctx.rect(0, 0, drawW + 1, drawH + 1);
