@@ -420,11 +420,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 // NOTE: If adding/removing global settings in future, ensure these instance overrides are updated to match
                 const instanceConfig = { ...config, ...item };
 
+                // For 90° or 270° rotations, swap dimensions so aspect ratio is preserved
+                const isSwapped = (item.rotation === 90 || item.rotation === 270);
+                const drawW = isSwapped ? cellH : cellW;
+                const drawH = isSwapped ? cellW : cellH;
+
                 ctx.beginPath();
-                ctx.rect(0, 0, cellW + 1, cellH + 1);
+                ctx.rect(0, 0, drawW + 1, drawH + 1);
                 ctx.clip();
 
-                drawWaveInstance(cellW + 1, cellH + 1, item.rotation, localX, localY, localMouseInCanvas, (instanceConfig.barsPerRow / referenceSize) * unitW * item.cs, (instanceConfig.waveRows / referenceSize) * unitH * item.rs, instanceConfig);
+                drawWaveInstance(drawW + 1, drawH + 1, item.rotation, localX, localY, localMouseInCanvas, (instanceConfig.barsPerRow / referenceSize) * unitW * item.cs, (instanceConfig.waveRows / referenceSize) * unitH * item.rs, instanceConfig);
                 ctx.restore();
             });
         }
