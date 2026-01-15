@@ -21,6 +21,10 @@ A WordPress Gutenberg block featuring an animated wave canvas background with hi
   - **Snap to Grid**: Force perfect alignment between tiled instances by locking to a global unit.
   - **Live View Toggle**: Pause/Resume the animation directly in the editor window.
 - **Seamless Tiling**: Optimized "bleed" method to eliminate fine lines and sub-pixel gaps between grid cells.
+- **Performance Optimized**: 
+  - **Frame-Rate Limiting**: Locked to 30 FPS for ~50% CPU savings.
+  - **Vertex Caching**: Pre-calculated polygon geometries to minimize trigonometric overhead.
+  - **Visibility Tracking**: Automatic pause when the block is off-screen using IntersectionObserver.
 - **Gutenberg Integration:** Fully integrated with WordPress block editor controls.
 
 ## Installation

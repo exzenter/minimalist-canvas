@@ -26,8 +26,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 dirX: 1,
                 dirY: 0
             },
-            rotations: {} // Cache per rotation angle
+            rotations: {}, // Cache per rotation angle
+            // === OPTIMIZATION: Pre-calculated polygon vertices ===
+            polygons: {
+                hexagon: [],
+                star: [],
+                octagon: []
+            }
         };
+
+        // Pre-calculate hexagon vertices (6 points)
+        for (let i = 0; i < 6; i++) {
+            const angle = (i * Math.PI) / 3;
+            cachedTrig.polygons.hexagon.push({ cos: Math.cos(angle), sin: Math.sin(angle) });
+        }
+
+        // Pre-calculate star vertices (10 points, alternating outer/inner)
+        for (let i = 0; i < 10; i++) {
+            const angle = (i * Math.PI) / 5 - Math.PI / 2;
+            cachedTrig.polygons.star.push({ cos: Math.cos(angle), sin: Math.sin(angle), isOuter: i % 2 === 0 });
+        }
+
+        // Pre-calculate octagon vertices (8 points)
+        for (let i = 0; i < 8; i++) {
+            const angle = (i * Math.PI) / 4 + Math.PI / 8;
+            cachedTrig.polygons.octagon.push({ cos: Math.cos(angle), sin: Math.sin(angle) });
+        }
 
         function updateTrigCache() {
             // Cache animation direction trig values
@@ -274,11 +298,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             ctx.fill();
                         }
                     } else if (conf.shapeMode === 'hexagon') {
+                        // Hexagon Mode - using cached vertices
                         const r = barWidth / 2;
+                        const hex = cachedTrig.polygons.hexagon;
                         ctx.beginPath();
-                        for (let i = 0; i < 6; i++) {
-                            const angle = (i * Math.PI) / 3;
-                            ctx.lineTo(x + r * Math.cos(angle), rowCenterY + r * Math.sin(angle));
+                        ctx.moveTo(x + r * hex[0].cos, rowCenterY + r * hex[0].sin);
+                        for (let i = 1; i < 6; i++) {
+                            ctx.lineTo(x + r * hex[i].cos, rowCenterY + r * hex[i].sin);
                         }
                         ctx.closePath();
                         if (conf.strokeOnly) {
@@ -288,13 +314,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             ctx.fill();
                         }
                     } else if (conf.shapeMode === 'star') {
+                        // Star Mode - using cached vertices
                         const outerR = barWidth / 2;
                         const innerR = outerR * 0.4;
+                        const star = cachedTrig.polygons.star;
                         ctx.beginPath();
-                        for (let i = 0; i < 10; i++) {
-                            const angle = (i * Math.PI) / 5 - Math.PI / 2;
-                            const r = i % 2 === 0 ? outerR : innerR;
-                            ctx.lineTo(x + r * Math.cos(angle), rowCenterY + r * Math.sin(angle));
+                        ctx.moveTo(x + outerR * star[0].cos, rowCenterY + outerR * star[0].sin);
+                        for (let i = 1; i < 10; i++) {
+                            const v = star[i];
+                            const r = v.isOuter ? outerR : innerR;
+                            ctx.lineTo(x + r * v.cos, rowCenterY + r * v.sin);
                         }
                         ctx.closePath();
                         if (conf.strokeOnly) {
@@ -344,11 +373,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         ctx.lineJoin = 'round';
                         ctx.stroke();
                     } else if (conf.shapeMode === 'octagon') {
+                        // Octagon Mode - using cached vertices
                         const r = barWidth / 2;
+                        const oct = cachedTrig.polygons.octagon;
                         ctx.beginPath();
-                        for (let i = 0; i < 8; i++) {
-                            const angle = (i * Math.PI) / 4 + Math.PI / 8;
-                            ctx.lineTo(x + r * Math.cos(angle), rowCenterY + r * Math.sin(angle));
+                        ctx.moveTo(x + r * oct[0].cos, rowCenterY + r * oct[0].sin);
+                        for (let i = 1; i < 8; i++) {
+                            ctx.lineTo(x + r * oct[i].cos, rowCenterY + r * oct[i].sin);
                         }
                         ctx.closePath();
                         if (conf.strokeOnly) {
@@ -434,16 +465,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        function animate() {
+        // Animation loop - 30 FPS limited for CPU optimization
+        let lastFrameTime = 0;
+        const targetFPS = 30;
+        const frameInterval = 1000 / targetFPS;
+
+        function animate(currentTime) {
             // === OPTIMIZATION 1: Only animate if visible ===
             if (!isVisible) {
                 animationFrame = null;
                 return;
             }
 
-            time += 0.016;
-            draw();
             animationFrame = requestAnimationFrame(animate);
+
+            // Skip frame if not enough time has passed (30 FPS limit)
+            if (currentTime - lastFrameTime < frameInterval) return;
+
+            lastFrameTime = currentTime - ((currentTime - lastFrameTime) % frameInterval);
+            time += 0.033; // ~30fps time increment
+            draw();
         }
 
         function startAnimation() {
